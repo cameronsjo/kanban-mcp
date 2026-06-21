@@ -1,0 +1,37 @@
+name: Go CI
+
+# Fast checks for the Go server. Path-filtered so it stays independent of the
+# Node CI (ci.yml) — neither runs on the other's changes.
+on:
+  push:
+    branches: [main, go-rewrite]
+    paths: ["**.go", "go.mod", "go.sum", ".github/workflows/go-ci.yml"]
+  pull_request:
+    paths: ["**.go", "go.mod", "go.sum", ".github/workflows/go-ci.yml"]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l internal cmd)"
+          if [ -n "$unformatted" ]; then
+            echo "gofmt needed on:"; echo "$unformatted"; exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: build
+        run: go build ./...
+
+      - name: test (race)
+        run: go test ./... -race -count=1
