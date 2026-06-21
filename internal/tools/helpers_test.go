@@ -80,6 +80,6 @@ func newToolClient(t *testing.T, m *mockPlanka) *planka.Client {
 }
 
 // Pointer helpers for building flat action-arg structs in tests.
-func sp(s string) *string  { return &s }
+func sp(s string) *string   { return &s }
 func fp(f float64) *float64 { return &f }
 func bp(b bool) *bool       { return &b }

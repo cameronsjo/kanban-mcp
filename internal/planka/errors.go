@@ -17,7 +17,7 @@ const (
 	KindConflict   ErrorKind = "conflict"   // 409
 	KindValidation ErrorKind = "validation" // 422
 	KindRateLimit  ErrorKind = "rate_limit" // 429
-	KindAPI        ErrorKind = "api"         // anything else
+	KindAPI        ErrorKind = "api"        // anything else
 )
 
 // APIError is a non-2xx response from Planka. The raw body is retained for

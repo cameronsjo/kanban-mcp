@@ -14,8 +14,8 @@ type BatchTaskInput struct {
 
 // BatchTaskResult is the per-item shape inside BatchResult.Results.
 type BatchTaskResult struct {
-	Success bool    `json:"success"`
-	Result  *Task   `json:"result,omitempty"`
+	Success bool  `json:"success"`
+	Result  *Task `json:"result,omitempty"`
 	Error   *struct {
 		Message string `json:"message"`
 	} `json:"error,omitempty"`
@@ -158,7 +158,9 @@ func (c *Client) BatchCreateTasks(ctx context.Context, items []BatchTaskInput) (
 			msg := err.Error()
 			out.Results = append(out.Results, BatchTaskResult{
 				Success: false,
-				Error:   &struct{ Message string `json:"message"` }{Message: msg},
+				Error: &struct {
+					Message string `json:"message"`
+				}{Message: msg},
 			})
 			out.Failures = append(out.Failures, BatchTaskFailure{
 				Index: i,
