@@ -5,3 +5,9 @@ coverage/
 .cursorrules
 .cursor/mcp.json
 .cursor
+
+# Go
+/bin/
+*.test
+*.out
+__debug_bin*
