@@ -69,19 +69,11 @@ func dispatchCard(ctx context.Context, client *planka.Client, args cardArgs) (an
 		if err != nil {
 			return nil, err
 		}
-		desc := ""
-		if args.Description != nil {
-			desc = *args.Description
-		}
-		pos := float64(0)
-		if args.Position != nil {
-			pos = *args.Position
-		}
 		return client.CreateCard(ctx, planka.CreateCardOptions{
 			ListID:      listID,
 			Name:        name,
-			Description: desc,
-			Position:    pos,
+			Description: deref(args.Description, ""),
+			Position:    deref(args.Position, 0),
 			Type:        "",
 		})
 
@@ -97,23 +89,14 @@ func dispatchCard(ctx context.Context, client *planka.Client, args cardArgs) (an
 		if err != nil {
 			return nil, err
 		}
-		opts := planka.UpdateCardOptions{}
-		if args.Name != nil {
-			opts.Name = args.Name
-		}
-		if args.Description != nil {
-			opts.Description = args.Description
-		}
-		if args.Position != nil {
-			opts.Position = args.Position
-		}
-		if args.DueDate != nil {
-			opts.DueDate = args.DueDate
-		}
-		if args.IsCompleted != nil {
-			opts.IsCompleted = args.IsCompleted
-		}
-		return client.UpdateCard(ctx, id, opts)
+		// nil pointers mean "leave unchanged" and propagate as-is.
+		return client.UpdateCard(ctx, id, planka.UpdateCardOptions{
+			Name:        args.Name,
+			Description: args.Description,
+			Position:    args.Position,
+			DueDate:     args.DueDate,
+			IsCompleted: args.IsCompleted,
+		})
 
 	case "move":
 		id, err := requireID("id", args.ID)
@@ -124,20 +107,22 @@ func dispatchCard(ctx context.Context, client *planka.Client, args cardArgs) (an
 		if err != nil {
 			return nil, err
 		}
-		if args.Position == nil {
-			return nil, fmt.Errorf("id, listId, and position are required for move action")
+		pos, err := requireFloat("position", args.Position)
+		if err != nil {
+			return nil, err
 		}
-		return client.MoveCard(ctx, id, listID, *args.Position, args.BoardID, args.ProjectID)
+		return client.MoveCard(ctx, id, listID, pos, args.BoardID, args.ProjectID)
 
 	case "duplicate":
 		id, err := requireID("id", args.ID)
 		if err != nil {
 			return nil, err
 		}
-		if args.Position == nil {
-			return nil, fmt.Errorf("id and position are required for duplicate action")
+		pos, err := requireFloat("position", args.Position)
+		if err != nil {
+			return nil, err
 		}
-		return client.DuplicateCard(ctx, id, *args.Position)
+		return client.DuplicateCard(ctx, id, pos)
 
 	case "delete":
 		id, err := requireID("id", args.ID)
@@ -169,7 +154,7 @@ func dispatchCard(ctx context.Context, client *planka.Client, args cardArgs) (an
 		})
 
 	case "get_details":
-		cardID, err := requireString("cardId", args.CardID)
+		cardID, err := requireID("cardId", args.CardID)
 		if err != nil {
 			return nil, err
 		}

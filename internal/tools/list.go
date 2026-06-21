@@ -69,14 +69,16 @@ func dispatchList(ctx context.Context, client *planka.Client, args listArgs) (an
 		if err != nil {
 			return nil, err
 		}
-		if args.Position == nil {
-			return nil, fmt.Errorf("boardId, name, and position are required for create action")
+		pos, err := requireFloat("position", args.Position)
+		if err != nil {
+			return nil, err
 		}
-		opts := planka.CreateListOptions{BoardID: boardID, Name: name, Position: *args.Position}
-		if args.Type != nil {
-			opts.Type = *args.Type
-		}
-		return client.CreateList(ctx, opts)
+		return client.CreateList(ctx, planka.CreateListOptions{
+			BoardID:  boardID,
+			Name:     name,
+			Position: pos,
+			Type:     deref(args.Type, ""),
+		})
 
 	case "update":
 		id, err := requireID("id", args.ID)
@@ -87,8 +89,8 @@ func dispatchList(ctx context.Context, client *planka.Client, args listArgs) (an
 		if err != nil {
 			return nil, err
 		}
-		if args.Position == nil {
-			return nil, fmt.Errorf("id, name, and position are required for update action")
+		if _, err := requireFloat("position", args.Position); err != nil {
+			return nil, err
 		}
 		return client.UpdateList(ctx, id, planka.UpdateListOptions{Name: &name, Position: args.Position})
 

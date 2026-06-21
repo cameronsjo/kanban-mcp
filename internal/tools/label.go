@@ -68,14 +68,15 @@ func dispatchLabel(ctx context.Context, client *planka.Client, args labelArgs) (
 		if err != nil {
 			return nil, err
 		}
-		if args.Position == nil {
-			return nil, fmt.Errorf("boardId, name, color, and position are required for create action")
+		pos, err := requireFloat("position", args.Position)
+		if err != nil {
+			return nil, err
 		}
 		return client.CreateLabel(ctx, planka.CreateLabelOptions{
 			BoardID:  boardID,
 			Name:     name,
 			Color:    color,
-			Position: *args.Position,
+			Position: pos,
 		})
 
 	case "update":
@@ -91,8 +92,8 @@ func dispatchLabel(ctx context.Context, client *planka.Client, args labelArgs) (
 		if err != nil {
 			return nil, err
 		}
-		if args.Position == nil {
-			return nil, fmt.Errorf("id, name, color, and position are required for update action")
+		if _, err := requireFloat("position", args.Position); err != nil {
+			return nil, err
 		}
 		return client.UpdateLabel(ctx, id, planka.UpdateLabelOptions{
 			Name:     &name,
@@ -112,7 +113,7 @@ func dispatchLabel(ctx context.Context, client *planka.Client, args labelArgs) (
 		if err != nil {
 			return nil, err
 		}
-		labelID, err := requireString("labelId", args.LabelId)
+		labelID, err := requireID("labelId", args.LabelId)
 		if err != nil {
 			return nil, err
 		}
@@ -123,7 +124,7 @@ func dispatchLabel(ctx context.Context, client *planka.Client, args labelArgs) (
 		if err != nil {
 			return nil, err
 		}
-		labelID, err := requireString("labelId", args.LabelId)
+		labelID, err := requireID("labelId", args.LabelId)
 		if err != nil {
 			return nil, err
 		}

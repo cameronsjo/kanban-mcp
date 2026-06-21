@@ -2,11 +2,6 @@ package planka
 
 import "context"
 
-// ListMutation is the success shape returned by delete (mirrors {success:true}).
-type ListMutation struct {
-	Success bool `json:"success"`
-}
-
 // CreateListOptions ports CreateListSchema. Type defaults to "active".
 type CreateListOptions struct {
 	BoardID  string
@@ -81,9 +76,9 @@ func (c *Client) UpdateList(ctx context.Context, id string, opts UpdateListOptio
 }
 
 // DeleteList deletes a list by id.
-func (c *Client) DeleteList(ctx context.Context, id string) (ListMutation, error) {
+func (c *Client) DeleteList(ctx context.Context, id string) (map[string]bool, error) {
 	if err := c.Delete(ctx, "/api/lists/"+id); err != nil {
-		return ListMutation{}, err
+		return nil, err
 	}
-	return ListMutation{Success: true}, nil
+	return map[string]bool{"success": true}, nil
 }

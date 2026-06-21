@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/cameronsjo/kanban-mcp/internal/planka"
@@ -32,31 +31,12 @@ type taskArgs struct {
 
 var taskActions = []string{"get_all", "create", "batch_create", "get_one", "update", "delete", "complete_task"}
 
-// applyTasksCardIDPattern sets the ^\d+$ pattern on tasks[].cardId, which is a
-// plankaId field in the TS zod schema (see index.ts line ~588).
-func applyTasksCardIDPattern(s *jsonschema.Schema) {
-	if s.Properties == nil {
-		return
-	}
-	tasksP := s.Properties["tasks"]
-	if tasksP == nil || tasksP.Items == nil {
-		return
-	}
-	if tasksP.Items.Properties == nil {
-		return
-	}
-	cardIDProp := tasksP.Items.Properties["cardId"]
-	if cardIDProp == nil {
-		return
-	}
-	cardIDProp.Pattern = numericIDPattern
-}
-
 func registerTaskManager(server *mcp.Server, client *planka.Client) error {
+	// tasks[].cardId is a plankaId field in the TS zod schema (index.ts ~588).
 	schema, err := inferSchema[taskArgs](
 		applyEnum("action", taskActions),
 		applyIDPattern("id", "cardId"),
-		applyTasksCardIDPattern,
+		applyNestedIDPattern("tasks", "cardId"),
 	)
 	if err != nil {
 		return err
@@ -89,11 +69,7 @@ func dispatchTask(ctx context.Context, client *planka.Client, args taskArgs) (an
 		if err != nil {
 			return nil, err
 		}
-		pos := 65535.0
-		if args.Position != nil {
-			pos = *args.Position
-		}
-		return client.CreateTask(ctx, cardID, name, pos)
+		return client.CreateTask(ctx, cardID, name, deref(args.Position, 65535))
 
 	case "batch_create":
 		if args.Tasks == nil || len(*args.Tasks) == 0 {
@@ -129,8 +105,7 @@ func dispatchTask(ctx context.Context, client *planka.Client, args taskArgs) (an
 		if err != nil {
 			return nil, err
 		}
-		t := true
-		return client.UpdateTask(ctx, id, nil, &t, nil)
+		return client.UpdateTask(ctx, id, nil, ptr(true), nil)
 
 	case "delete":
 		id, err := requireID("id", args.ID)

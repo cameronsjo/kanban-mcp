@@ -59,14 +59,6 @@ func registerProjectBoardManager(server *mcp.Server, client *planka.Client) erro
 	return nil
 }
 
-// derefBool safely dereferences a *bool, returning false for nil.
-func derefBool(b *bool) bool {
-	if b == nil {
-		return false
-	}
-	return *b
-}
-
 func dispatchProjectBoard(ctx context.Context, client *planka.Client, args projectBoardArgs) (any, error) {
 	switch args.Action {
 	case "get_projects":
@@ -98,13 +90,14 @@ func dispatchProjectBoard(ctx context.Context, client *planka.Client, args proje
 		if err != nil {
 			return nil, err
 		}
-		if args.Position == nil {
-			return nil, fmt.Errorf("projectId, name, and position are required for create_board action")
+		pos, err := requireFloat("position", args.Position)
+		if err != nil {
+			return nil, err
 		}
 		return client.CreateBoard(ctx, planka.CreateBoardOptions{
 			ProjectID: projectID,
 			Name:      name,
-			Position:  *args.Position,
+			Position:  pos,
 		})
 
 	case "get_board":
@@ -123,17 +116,14 @@ func dispatchProjectBoard(ctx context.Context, client *planka.Client, args proje
 		if err != nil {
 			return nil, err
 		}
-		if args.Position == nil {
-			return nil, fmt.Errorf("id, name, and position are required for update_board action")
+		if _, err := requireFloat("position", args.Position); err != nil {
+			return nil, err
 		}
-		opts := planka.UpdateBoardOptions{
+		return client.UpdateBoard(ctx, id, planka.UpdateBoardOptions{
 			Name:     &name,
 			Position: args.Position,
-		}
-		if args.Type != nil {
-			opts.Type = args.Type
-		}
-		return client.UpdateBoard(ctx, id, opts)
+			Type:     args.Type,
+		})
 
 	case "delete_board":
 		id, err := requireID("id", args.ID)
@@ -143,11 +133,11 @@ func dispatchProjectBoard(ctx context.Context, client *planka.Client, args proje
 		return client.DeleteBoard(ctx, id)
 
 	case "get_board_summary":
-		boardID, err := requireString("boardId", args.BoardID)
+		boardID, err := requireID("boardId", args.BoardID)
 		if err != nil {
 			return nil, err
 		}
-		return boardSummary(ctx, client, boardID, derefBool(args.IncludeTaskDetails), derefBool(args.IncludeComments))
+		return boardSummary(ctx, client, boardID, deref(args.IncludeTaskDetails, false), deref(args.IncludeComments, false))
 
 	default:
 		return nil, fmt.Errorf("unknown action: %s", args.Action)

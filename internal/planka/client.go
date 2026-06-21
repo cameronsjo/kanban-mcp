@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
@@ -24,6 +25,8 @@ import (
 
 	"github.com/cameronsjo/kanban-mcp/internal/config"
 )
+
+var logger = slog.Default()
 
 // Client is a Planka API client. It is safe for concurrent use and is intended
 // to be constructed once and shared across all MCP sessions so the token cache
@@ -86,13 +89,23 @@ func normalizePath(path string) string {
 // long-lived daemon self-heals from an expired or revoked token. Non-2xx
 // responses become typed *APIError values.
 func (c *Client) do(ctx context.Context, method, path string, body, out any) error {
-	url := c.baseURL + normalizePath(path)
+	normPath := normalizePath(path)
+	// Defense in depth: no legitimate Planka path contains a parent-directory
+	// segment, so reject one outright. normalizePath deliberately does not
+	// path.Clean, so this backstops any ID that reaches interpolation without a
+	// numeric (^\d+$) check and stops cross-resource traversal at the wire.
+	if strings.Contains(normPath, "..") {
+		return &APIError{Status: http.StatusBadRequest, Kind: KindValidation, Message: "refusing request path containing '..'"}
+	}
+	url := c.baseURL + normPath
+	logger.Debug("Preparing request", "method", method, "path", path)
 
 	var payload []byte
 	if body != nil {
 		var err error
 		payload, err = json.Marshal(body)
 		if err != nil {
+			logger.Debug("Failed to marshal request body", "path", path, "error", err.Error())
 			return fmt.Errorf("marshal request body: %w", err)
 		}
 	}
@@ -109,6 +122,7 @@ func (c *Client) do(ctx context.Context, method, path string, body, out any) err
 		}
 		req, err := http.NewRequestWithContext(ctx, method, url, reqBody)
 		if err != nil {
+			logger.Debug("Failed to build request", "path", path, "error", err.Error())
 			return fmt.Errorf("build request: %w", err)
 		}
 		req.Header.Set("Accept", "application/json")
@@ -120,27 +134,32 @@ func (c *Client) do(ctx context.Context, method, path string, body, out any) err
 
 		resp, err := c.http.Do(req)
 		if err != nil {
+			logger.Debug("Request failed", "method", method, "path", path, "error", err.Error())
 			return fmt.Errorf("planka request to %s: %w", url, err)
 		}
 		respBody, readErr := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 		if readErr != nil {
+			logger.Debug("Failed to read response", "path", path, "error", readErr.Error())
 			return fmt.Errorf("read response from %s: %w", url, readErr)
 		}
 
 		// A cached token rejected on the first attempt: drop it (only if it is
 		// still the one we used) and retry with a fresh login.
 		if resp.StatusCode == http.StatusUnauthorized && attempt == 0 {
+			logger.Debug("Token rejected, retrying after refresh", "path", path, "attempt", attempt)
 			c.clearToken(token)
 			continue
 		}
 
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			logger.Debug("Request failed with non-2xx status", "method", method, "path", path, "statusCode", resp.StatusCode)
 			return newAPIError(resp.StatusCode, respBody)
 		}
 
 		if out != nil {
 			if err := json.Unmarshal(respBody, out); err != nil {
+				logger.Debug("Failed to decode response", "path", path, "error", err.Error())
 				return fmt.Errorf("decode response from %s: %w", url, err)
 			}
 		}
@@ -159,9 +178,11 @@ func (c *Client) ensureToken(ctx context.Context) (string, error) {
 	t := c.token
 	c.mu.RUnlock()
 	if t != "" {
+		logger.Debug("Using cached token")
 		return t, nil
 	}
 
+	logger.Debug("Token not cached, acquiring via singleflight")
 	v, err, _ := c.sf.Do("login", func() (any, error) {
 		// Re-check inside the flight: another goroutine may have logged in while
 		// this one waited for the flight to start.
@@ -169,6 +190,7 @@ func (c *Client) ensureToken(ctx context.Context) (string, error) {
 		t := c.token
 		c.mu.RUnlock()
 		if t != "" {
+			logger.Debug("Token cached by concurrent goroutine")
 			return t, nil
 		}
 		tok, err := c.login(ctx)
@@ -181,6 +203,7 @@ func (c *Client) ensureToken(ctx context.Context) (string, error) {
 		return tok, nil
 	})
 	if err != nil {
+		logger.Debug("Failed to ensure token", "error", err.Error())
 		return "", err
 	}
 	return v.(string), nil
@@ -191,6 +214,7 @@ func (c *Client) ensureToken(ctx context.Context) (string, error) {
 func (c *Client) clearToken(used string) {
 	c.mu.Lock()
 	if c.token == used {
+		logger.Debug("Clearing cached token due to 401")
 		c.token = ""
 	}
 	c.mu.Unlock()

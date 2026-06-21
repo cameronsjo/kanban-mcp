@@ -27,7 +27,6 @@ var (
 	}
 	membershipRoles = []string{"editor", "viewer"}
 	listTypes       = []string{"active", "closed"}
-	cardTypes       = []string{"project", "story"}
 )
 
 // inferSchema builds the JSON schema for the input type In and applies the given
@@ -73,6 +72,21 @@ func applyEnum(field string, values []string) func(*jsonschema.Schema) {
 	}
 }
 
+// applyNestedIDPattern sets the ^\d+$ pattern on a field nested inside an array
+// property's item schema (e.g. tasks[].cardId), generalizing applyIDPattern one
+// level deeper.
+func applyNestedIDPattern(arrayField, nestedField string) func(*jsonschema.Schema) {
+	return func(s *jsonschema.Schema) {
+		arr := s.Properties[arrayField]
+		if arr == nil || arr.Items == nil {
+			return
+		}
+		if p := arr.Items.Properties[nestedField]; p != nil {
+			p.Pattern = numericIDPattern
+		}
+	}
+}
+
 // --- Layer B: handler-side, action-conditional validation ---------------------
 // A flat action-discriminated schema cannot express "create needs name+listId",
 // so per-action requiredness lives in the handlers. requireID re-checks ^\d+$
@@ -110,3 +124,23 @@ func requireString(field string, v *string) (string, error) {
 	}
 	return *v, nil
 }
+
+// requireFloat returns the value of a required numeric field (e.g. position).
+func requireFloat(field string, v *float64) (float64, error) {
+	if v == nil {
+		return 0, fmt.Errorf("%s is required", field)
+	}
+	return *v, nil
+}
+
+// deref reads *p, or def when p is nil — the nil-safe read for optional pointer
+// fields in the flat action structs.
+func deref[T any](p *T, def T) T {
+	if p != nil {
+		return *p
+	}
+	return def
+}
+
+// ptr returns a pointer to v, for building optional request-body fields.
+func ptr[T any](v T) *T { return &v }

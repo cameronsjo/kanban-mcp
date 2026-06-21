@@ -28,14 +28,11 @@ func (c *Client) GetBoards(ctx context.Context, projectID string) ([]Board, erro
 	if env.Included == nil {
 		return []Board{}, nil
 	}
-	var result []Board
+	result := []Board{}
 	for _, b := range env.Included.Boards {
 		if b.ProjectID == projectID {
 			result = append(result, b)
 		}
-	}
-	if result == nil {
-		return []Board{}, nil
 	}
 	return result, nil
 }
@@ -48,6 +45,17 @@ func (c *Client) GetBoard(ctx context.Context, id string) (*Board, error) {
 		return nil, err
 	}
 	return &env.Item, nil
+}
+
+// BoardDetail fetches a board together with its denormalized included block
+// (lists, labels, cards, ...) in one request, so callers that need several of
+// those — board_summary — don't re-GET the same board detail per resource.
+func (c *Client) BoardDetail(ctx context.Context, id string) (*Board, *Included, error) {
+	var env itemEnvelope[Board]
+	if err := c.Get(ctx, "/api/boards/"+id, &env); err != nil {
+		return nil, nil, err
+	}
+	return &env.Item, env.Included, nil
 }
 
 // CreateBoard creates a board in a project, then best-effort: adds the admin

@@ -6,14 +6,18 @@ package serve
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"io"
 	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
+
+var logger = slog.Default()
 
 // MCPPath is the endpoint Streamable-HTTP clients connect to.
 const MCPPath = "/mcp"
@@ -22,9 +26,12 @@ const MCPPath = "/mcp"
 // It is a defense-in-depth layer on top of the loopback bind; when token is
 // empty the caller should not install it.
 func BearerGate(token string, next http.Handler) http.Handler {
-	want := "Bearer " + token
+	want := []byte("Bearer " + token)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != want {
+		// Constant-time compare so the gate leaks no timing side-channel on the
+		// static token.
+		got := []byte(r.Header.Get("Authorization"))
+		if subtle.ConstantTimeCompare(got, want) != 1 {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -58,6 +65,8 @@ func Handler(server *mcp.Server, authToken string) http.Handler {
 // then shuts down gracefully. addr MUST be a loopback address — the process
 // holds Planka admin credentials and must never listen on a routable interface.
 func HTTP(ctx context.Context, addr, authToken string, server *mcp.Server) error {
+	logger.Debug("Preparing to bind HTTP server", "addr", addr, "hasBearerToken", authToken != "")
+
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           Handler(server, authToken),
@@ -66,14 +75,22 @@ func HTTP(ctx context.Context, addr, authToken string, server *mcp.Server) error
 
 	go func() {
 		<-ctx.Done()
+		logger.Debug("Shutdown signal received")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		_ = srv.Shutdown(shutdownCtx)
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			logger.Warn("HTTP server shutdown error", "error", err.Error())
+		}
 	}()
 
 	log.Printf("kanban-mcp: serving MCP on http://%s%s", addr, MCPPath)
+	logger.Info("HTTP server started", "addr", addr, "endpoint", MCPPath)
+
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		logger.Error("HTTP server error", "addr", addr, "error", err.Error())
 		return err
 	}
+
+	logger.Info("HTTP server closed")
 	return nil
 }

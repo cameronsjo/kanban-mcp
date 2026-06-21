@@ -93,7 +93,7 @@ func TestLabelDispatch(t *testing.T) {
 		{
 			name:    "create missing position",
 			args:    labelArgs{Action: "create", BoardID: sp("10"), Name: sp("Bug"), Color: sp("coral-green")},
-			wantErr: "boardId, name, color, and position are required",
+			wantErr: "position is required",
 		},
 		// Validation: add_to_card missing labelId
 		{

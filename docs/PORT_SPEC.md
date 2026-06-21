@@ -48,7 +48,8 @@ the TypeScript server's behavior. Cross-check each function against the named
 7. **Layer B requiredness** — in the handler: use `requireID(field, ptr)` for the
    `plankaId` fields (re-checks `^\d+$`), `requireString(field, ptr)` for plain
    `z.string()` id-like fields (presence only), `requireName(field, ptr)` for
-   names (trim + non-empty). Mirror the TS `if (!args.x) throw` checks exactly,
+   names (trim + non-empty), `requireFloat(field, ptr)` for required `*float64`
+   fields (e.g. position). Mirror the TS `if (!args.x) throw` checks exactly,
    including which fields each action requires.
 8. **Tests** — `internal/tools/<r>_test.go`, table-driven through `newToolClient`.
    Cover: each action's happy path (assert method + path + request body), the
@@ -109,7 +110,7 @@ IncludeComments*bool.
 - get_board: requireID("id"); GetBoard.
 - update_board: require id(requireID), name(requireName), Position present; UpdateBoard with Name+Position (and Type if set).
 - delete_board: requireID("id"); DeleteBoard.
-- get_board_summary: requireString("boardId") (boardId is z.string here, presence only); `boardSummary(ctx, client, boardID, derefBool(IncludeTaskDetails), derefBool(IncludeComments))` (the composite stub already exists).
+- get_board_summary: requireString("boardId") (boardId is z.string here, presence only); `boardSummary(ctx, client, boardID, deref(args.IncludeTaskDetails, false), deref(args.IncludeComments, false))` (the composite stub already exists).
 
 ---
 

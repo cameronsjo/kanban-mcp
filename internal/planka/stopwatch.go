@@ -88,7 +88,7 @@ func (c *Client) GetCardStopwatch(ctx context.Context, id string) (any, error) {
 	sw := card.Stopwatch
 	isRunning := sw.StartedAt != nil
 	current := float64(0)
-	if isRunning && sw.StartedAt != nil {
+	if isRunning {
 		parsed, err := time.Parse(time.RFC3339, *sw.StartedAt)
 		if err == nil {
 			current = float64(int(time.Since(parsed).Seconds()))

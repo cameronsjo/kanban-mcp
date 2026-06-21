@@ -34,7 +34,7 @@ func (c *Client) GetComments(ctx context.Context, cardID string) ([]Comment, err
 // which walks projects → boards → cards → comments — PROPAGATE errors.
 func (c *Client) GetComment(ctx context.Context, id string) (*Comment, error) {
 	// GET /api/projects to discover all boards via included.boards.
-	var projectsEnv itemEnvelope[struct{}]
+	var projectsEnv listEnvelope[Project]
 	if err := c.Get(ctx, "/api/projects", &projectsEnv); err != nil {
 		return nil, err
 	}

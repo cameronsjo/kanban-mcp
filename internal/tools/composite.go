@@ -55,17 +55,19 @@ type summaryList struct {
 }
 
 func boardSummary(ctx context.Context, client *planka.Client, boardID string, includeTaskDetails, includeComments bool) (any, error) {
-	board, err := client.GetBoard(ctx, boardID)
+	// One fetch: the board detail carries its lists and labels in the included
+	// block, so board_summary doesn't re-GET the same board per resource.
+	board, included, err := client.BoardDetail(ctx, boardID)
 	if err != nil {
 		return nil, err
 	}
-	if board == nil {
-		return nil, fmt.Errorf("Board with ID %s not found", boardID)
-	}
-
-	lists, err := client.GetLists(ctx, boardID)
-	if err != nil {
-		return nil, err
+	var lists []planka.List
+	labels := []planka.Label{} // non-nil so an empty board renders "labels": [] (not null), matching GetLabels
+	if included != nil {
+		lists = included.Lists
+		if included.Labels != nil {
+			labels = included.Labels
+		}
 	}
 
 	summaryLists := make([]summaryList, len(lists))
@@ -109,11 +111,6 @@ func boardSummary(ctx context.Context, client *planka.Client, boardID string, in
 		})
 	}
 	if err := g.Wait(); err != nil {
-		return nil, err
-	}
-
-	labels, err := client.GetLabels(ctx, boardID)
-	if err != nil {
 		return nil, err
 	}
 
@@ -217,9 +214,6 @@ func cardDetails(ctx context.Context, client *planka.Client, cardID string) (any
 	if err != nil {
 		return nil, err
 	}
-	if card == nil {
-		return nil, fmt.Errorf("Card with ID %s not found", cardID)
-	}
 
 	var tasks []planka.Task
 	var comments []planka.Comment
@@ -284,27 +278,25 @@ func cardDetails(ctx context.Context, client *planka.Client, cardID string) (any
 	}, nil
 }
 
-// findBoardIDForList walks projects → boards → lists and returns the board whose
-// lists include listID, or "" if none match.
+// findBoardIDForList returns the board whose lists include listID, or "" if none
+// match. The projects listing already carries every board in its included block,
+// so it walks those directly instead of re-fetching boards per project.
 func findBoardIDForList(ctx context.Context, client *planka.Client, listID string) (string, error) {
 	page, err := client.GetProjects(ctx, 1, 100)
 	if err != nil {
 		return "", err
 	}
-	for _, project := range page.Items {
-		boards, err := client.GetBoards(ctx, project.ID)
+	if page.Included == nil {
+		return "", nil
+	}
+	for _, board := range page.Included.Boards {
+		lists, err := client.GetLists(ctx, board.ID)
 		if err != nil {
 			return "", err
 		}
-		for _, board := range boards {
-			lists, err := client.GetLists(ctx, board.ID)
-			if err != nil {
-				return "", err
-			}
-			for _, l := range lists {
-				if l.ID == listID {
-					return board.ID, nil
-				}
+		for _, l := range lists {
+			if l.ID == listID {
+				return board.ID, nil
 			}
 		}
 	}
@@ -314,14 +306,8 @@ func findBoardIDForList(ctx context.Context, client *planka.Client, listID strin
 // --- create_card_with_tasks --------------------------------------------------
 
 func createCardWithTasks(ctx context.Context, client *planka.Client, params CreateCardWithTasksParams) (any, error) {
-	position := 65535.0
-	if params.Position != nil {
-		position = *params.Position
-	}
-	description := ""
-	if params.Description != nil {
-		description = *params.Description
-	}
+	position := deref(params.Position, 65535)
+	description := deref(params.Description, "")
 
 	// Best-effort, no transaction: the card is created first, then tasks, then
 	// the comment. A failure mid-way leaves partial state and surfaces the

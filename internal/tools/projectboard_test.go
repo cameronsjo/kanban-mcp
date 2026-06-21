@@ -284,19 +284,19 @@ func TestGetBoardSummaryRequiresBoardID(t *testing.T) {
 	}
 }
 
-// TestGetBoardSummaryBoardIdNotHardened verifies that boardId is plain z.string
-// (no ^\d+$ enforcement) — a non-numeric value is accepted by the dispatch
-// layer (the stub will error, but NOT with a "numeric Planka ID" message).
-func TestGetBoardSummaryBoardIdNotHardened(t *testing.T) {
+// TestGetBoardSummaryBoardIdHardenedAtLayerB locks the security fix: boardId
+// carries NO schema pattern (Layer A — the golden test's noPattern list keeps
+// zod parity), but the handler rejects a non-numeric boardId (Layer B requireID)
+// so it cannot traverse into a privileged Planka path (e.g. boardSummary →
+// GET /api/boards/<boardId>).
+func TestGetBoardSummaryBoardIdHardenedAtLayerB(t *testing.T) {
 	c := newToolClient(t, &mockPlanka{})
 	_, err := dispatchProjectBoard(context.Background(), c, projectBoardArgs{
 		Action:  "get_board_summary",
-		BoardID: sp("not-numeric"),
+		BoardID: sp("1/../../users"),
 	})
-	// The stub returns "not yet implemented" — that is acceptable.
-	// What must NOT happen is a "numeric Planka ID" rejection.
-	if err != nil && strings.Contains(err.Error(), "numeric Planka ID") {
-		t.Fatalf("boardId should NOT be hardened to numeric, but got: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "numeric Planka ID") {
+		t.Fatalf("boardId path-traversal must be rejected at Layer B, got: %v", err)
 	}
 }
 
