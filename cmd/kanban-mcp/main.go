@@ -1,17 +1,22 @@
 // Command kanban-mcp is a Model Context Protocol server for Planka kanban
 // boards. It runs as a single long-lived Streamable-HTTP daemon that every
-// Claude Code session shares (default), or over stdio for local debugging.
+// Claude Code session shares (default in production), or over stdio for local
+// debugging and the MCP Inspector.
 package main
 
 import (
 	"context"
 	"flag"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/cameronsjo/kanban-mcp/internal/config"
 	"github.com/cameronsjo/kanban-mcp/internal/planka"
+	"github.com/cameronsjo/kanban-mcp/internal/serve"
 	"github.com/cameronsjo/kanban-mcp/internal/tools"
 )
 
@@ -20,7 +25,7 @@ var version = "dev"
 
 func main() {
 	transport := flag.String("transport", "stdio", "transport: stdio|http")
-	addr := flag.String("addr", config.DefaultAddr, "http listen address (http transport)")
+	addr := flag.String("addr", config.DefaultAddr, "http listen address (http transport); MUST be loopback")
 	flag.Parse()
 
 	cfg := config.FromEnv()
@@ -34,6 +39,8 @@ func main() {
 		log.Printf("kanban-mcp: warning: %v", err)
 	}
 
+	// One shared Planka client, reused across every request and session, so the
+	// token cache (mutex + singleflight) persists process-wide.
 	client := planka.NewClient(cfg, version)
 
 	server := mcp.NewServer(&mcp.Implementation{
@@ -50,8 +57,13 @@ func main() {
 			log.Fatalf("kanban-mcp: %v", err)
 		}
 	case config.TransportHTTP:
-		log.Fatalf("kanban-mcp: http transport arrives in step 6")
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		if err := serve.HTTP(ctx, cfg.Addr, cfg.AuthToken, server); err != nil {
+			log.Fatalf("kanban-mcp: %v", err)
+		}
 	default:
 		log.Fatalf("kanban-mcp: unsupported transport %q", cfg.Transport)
+		os.Exit(2)
 	}
 }
