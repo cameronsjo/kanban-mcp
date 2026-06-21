@@ -56,6 +56,25 @@ services:
       - "-c"
       - "shared_buffers=256MB"
 
+  # The Go MCP server. Profile-gated so the default `up` (Planka + Postgres for
+  # integration tests) is unaffected; run with `docker compose --profile mcp up -d`.
+  # Published to host loopback only — the process holds Planka admin creds.
+  kanban-mcp:
+    image: ghcr.io/cameronsjo/kanban-mcp:latest
+    container_name: kanban-mcp
+    restart: unless-stopped
+    profiles: ["mcp"]
+    ports:
+      - "127.0.0.1:8900:8900"
+    environment:
+      - PLANKA_BASE_URL=${PLANKA_BASE_URL:-http://kanban:1337}
+      - PLANKA_AGENT_EMAIL=${PLANKA_AGENT_EMAIL}
+      - PLANKA_AGENT_PASSWORD=${PLANKA_AGENT_PASSWORD}
+      - PLANKA_ADMIN_ID=${PLANKA_ADMIN_ID}
+      - PLANKA_MCP_AUTH_TOKEN=${PLANKA_MCP_AUTH_TOKEN:-}
+    depends_on:
+      - kanban
+
 volumes:
   kanban-db:
     name: kanban-db-persistent
