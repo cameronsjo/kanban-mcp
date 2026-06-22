@@ -11,3 +11,4 @@ coverage/
 *.test
 *.out
 __debug_bin*
+.claude/intros/
