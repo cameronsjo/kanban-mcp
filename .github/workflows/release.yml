@@ -1,0 +1,44 @@
+name: Release
+
+# goreleaser runs on a pushed semver tag: builds the static binaries, publishes
+# a GitHub release + checksums, the Homebrew cask, and the GHCR image.
+#
+# Secrets required (set before the first tag):
+#   HOMEBREW_TAP_TOKEN — write access to cameronsjo/homebrew-tap (GitHub App /
+#   PAT). The default GITHUB_TOKEN cannot push to another repo. See the
+#   releasing-to-homebrew-tap skill for the cross-repo App auth setup.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
