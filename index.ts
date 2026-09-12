@@ -20,6 +20,7 @@ import {
   getCardDetails,
 } from "./tools/index.js";
 
+import { plankaId } from "./common/schemas.js";
 import { VERSION } from "./common/version.js";
 
 const server = new McpServer(
@@ -53,8 +54,8 @@ server.tool(
         "get_board_summary",
       ])
       .describe("The action to perform"),
-    id: z.string().optional().describe("The ID of the project or board"),
-    projectId: z.string().optional().describe("The ID of the project"),
+    id: plankaId.optional().describe("The ID of the project or board"),
+    projectId: plankaId.optional().describe("The ID of the project"),
     name: z.string().optional().describe("The name of the board"),
     position: z.number().optional().describe("The position of the board"),
     type: z.string().optional().describe("The type of the board"),
@@ -63,8 +64,7 @@ server.tool(
       .optional()
       .describe("The page number for pagination (1-indexed)"),
     perPage: z.number().optional().describe("The number of items per page"),
-    boardId: z
-      .string()
+    boardId: plankaId
       .optional()
       .describe("The ID of the board to get a summary for"),
     includeTaskDetails: z
@@ -168,8 +168,8 @@ server.tool(
     action: z
       .enum(["get_all", "create", "update", "delete", "get_one"])
       .describe("The action to perform"),
-    id: z.string().optional().describe("The ID of the list"),
-    boardId: z.string().optional().describe("The ID of the board"),
+    id: plankaId.optional().describe("The ID of the list"),
+    boardId: plankaId.optional().describe("The ID of the board"),
     name: z.string().optional().describe("The name of the list"),
     position: z.number().optional().describe("The position of the list"),
   },
@@ -245,8 +245,8 @@ server.tool(
         "get_details",
       ])
       .describe("The action to perform"),
-    id: z.string().optional().describe("The ID of the card"),
-    listId: z.string().optional().describe("The ID of the list"),
+    id: plankaId.optional().describe("The ID of the card"),
+    listId: plankaId.optional().describe("The ID of the list"),
     boardId: z
       .string()
       .optional()
@@ -276,8 +276,7 @@ server.tool(
       .string()
       .optional()
       .describe("Optional comment to add to the card"),
-    cardId: z
-      .string()
+    cardId: plankaId
       .optional()
       .describe("The ID of the card to get details for"),
   },
@@ -390,7 +389,7 @@ server.tool(
     action: z
       .enum(["start", "stop", "get", "reset"])
       .describe("The action to perform"),
-    id: z.string().describe("The ID of the card"),
+    id: plankaId.describe("The ID of the card"),
   },
   async (args) => {
     let result;
@@ -437,11 +436,10 @@ server.tool(
         "remove_from_card",
       ])
       .describe("The action to perform"),
-    id: z.string().optional().describe("The ID of the label"),
-    boardId: z.string().optional().describe("The ID of the board"),
-    cardId: z.string().optional().describe("The ID of the card"),
-    labelId: z
-      .string()
+    id: plankaId.optional().describe("The ID of the label"),
+    boardId: plankaId.optional().describe("The ID of the board"),
+    cardId: plankaId.optional().describe("The ID of the card"),
+    labelId: plankaId
       .optional()
       .describe("The ID of the label (for card operations)"),
     name: z.string().optional().describe("The name of the label"),
@@ -569,8 +567,8 @@ server.tool(
         "complete_task",
       ])
       .describe("The action to perform"),
-    id: z.string().optional().describe("The ID of the task"),
-    cardId: z.string().optional().describe("The ID of the card"),
+    id: plankaId.optional().describe("The ID of the task"),
+    cardId: plankaId.optional().describe("The ID of the card"),
     name: z.string().optional().describe("The name of the task"),
     isCompleted: z
       .boolean()
@@ -580,7 +578,7 @@ server.tool(
     tasks: z
       .array(
         z.object({
-          cardId: z.string().describe("The ID of the card for this task"),
+          cardId: plankaId.describe("The ID of the card for this task"),
           name: z.string().describe("The name of this task"),
           position: z.number().optional().describe("The position of this task"),
         })
@@ -661,8 +659,8 @@ server.tool(
     action: z
       .enum(["get_all", "create", "get_one", "update", "delete"])
       .describe("The action to perform"),
-    id: z.string().optional().describe("The ID of the comment"),
-    cardId: z.string().optional().describe("The ID of the card"),
+    id: plankaId.optional().describe("The ID of the comment"),
+    cardId: plankaId.optional().describe("The ID of the card"),
     text: z.string().optional().describe("The text content of the comment"),
   },
   async (args) => {
@@ -720,9 +718,9 @@ server.tool(
     action: z
       .enum(["get_all", "create", "get_one", "update", "delete"])
       .describe("The action to perform"),
-    id: z.string().optional().describe("The ID of the membership"),
-    boardId: z.string().optional().describe("The ID of the board"),
-    userId: z.string().optional().describe("The ID of the user"),
+    id: plankaId.optional().describe("The ID of the membership"),
+    boardId: plankaId.optional().describe("The ID of the board"),
+    userId: plankaId.optional().describe("The ID of the user"),
     role: z
       .enum(["editor", "viewer"])
       .optional()
