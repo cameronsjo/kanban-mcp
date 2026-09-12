@@ -307,8 +307,11 @@ export async function removeLabelFromCard(cardId: string, labelId: string) {
     try {
         // Planka v2: DELETE /api/cards/{cardId}/card-labels/labelId:{labelId}
         // (the `labelId:` prefix is Planka's literal path-param format)
+        // encodeURIComponent is defense-in-depth alongside the `plankaId`
+        // regex validation at the MCP tool boundary (index.ts) — belt and
+        // suspenders against any future caller that bypasses that schema.
         await plankaRequest(
-            `/api/cards/${cardId}/card-labels/labelId:${labelId}`,
+            `/api/cards/${encodeURIComponent(cardId)}/card-labels/labelId:${encodeURIComponent(labelId)}`,
             {
                 method: "DELETE",
             },

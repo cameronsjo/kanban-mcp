@@ -2,9 +2,11 @@ version: "3"
 
 services:
   kanban:
-    # Pinned to the version the v2.1 route work was verified against (see
-    # commit 764821a) for reproducible integration runs. Bump deliberately.
-    image: ghcr.io/plankanban/planka:2.1.1
+    # Pinned for reproducible integration runs. Bump deliberately.
+    # 2.2.1 patches GHSA-8jqr-gh78-qjp7 (path traversal in JWT-protected
+    # static file routes, affects 2.1.1). Re-run the integration suite
+    # (npm run test:integration) after any bump before trusting it.
+    image: ghcr.io/plankanban/planka:2.2.1
     container_name: kanban
     restart: unless-stopped
     ports:

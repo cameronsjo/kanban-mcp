@@ -336,8 +336,9 @@ To test the integration with Planka:
 
 1. Ensure Planka is running: `npm run up`
 2. On a freshly-provisioned Planka 2.1.x, accept the terms-of-service gate once
-   so the agent can authenticate:
-   `bash scripts/accept-planka-terms.sh http://localhost:3333 demo@demo.demo demo`
+   so the agent can authenticate (the password is read from
+   `PLANKA_AGENT_PASSWORD` or prompted — never a command-line argument):
+   `PLANKA_AGENT_PASSWORD=demo bash scripts/accept-planka-terms.sh http://localhost:3333 demo@demo.demo`
 3. Run the integration tests: `npm run test:integration`
 
 ### 🤖 Testing with Cursor

@@ -7,20 +7,36 @@
 # Run this once against a freshly-provisioned instance before the integration
 # suite (it's a no-op if terms were already accepted).
 #
-# Usage: accept-planka-terms.sh <base_url> <email_or_username> <password>
+# Usage: accept-planka-terms.sh <base_url> <email_or_username>
+#
+# The password is never taken as a command-line argument (argv is visible via
+# `ps` and lands in shell history). Supply it via the PLANKA_AGENT_PASSWORD
+# env var, or the script prompts for it on a real terminal.
 set -euo pipefail
 
 BASE_URL="${1:?base url required}"
 EMAIL="${2:?email/username required}"
-PASSWORD="${3:?password required}"
+
+if [ -n "${PLANKA_AGENT_PASSWORD:-}" ]; then
+  PASSWORD="$PLANKA_AGENT_PASSWORD"
+else
+  if [ ! -t 0 ]; then
+    echo "NO_PASSWORD: set PLANKA_AGENT_PASSWORD or run this from a real terminal" >&2
+    exit 1
+  fi
+  read -r -s -p "Planka password for ${EMAIL}: " PASSWORD
+  echo >&2
+fi
+
 JAR="$(mktemp)"
 trap 'rm -f "$JAR"' EXIT
 
 # 1. Login. A terms-gated instance answers 403 with a pendingToken; an already
 #    -accepted instance answers 200 with {item: <token>}.
-login_body="$(command curl -s -c "$JAR" -X POST "${BASE_URL}/api/access-tokens" \
-  -H 'Content-Type: application/json' \
-  -d "{\"emailOrUsername\":\"${EMAIL}\",\"password\":\"${PASSWORD}\"}")"
+login_body="$(jq -n --arg email "$EMAIL" --arg password "$PASSWORD" \
+  '{emailOrUsername: $email, password: $password}' \
+  | command curl -s -c "$JAR" -X POST "${BASE_URL}/api/access-tokens" \
+      -H 'Content-Type: application/json' -d @-)"
 
 if echo "$login_body" | jq -e '.item' >/dev/null 2>&1; then
   echo "ALREADY_OK: login already returns an access token (terms previously accepted)"
@@ -29,7 +45,10 @@ fi
 
 pending="$(echo "$login_body" | jq -r '.pendingToken // empty')"
 if [ -z "$pending" ]; then
-  echo "NO_PENDING_TOKEN: unexpected login response: ${login_body}"
+  # Don't echo the raw body: a terms-gated response still carries a
+  # pendingToken (a credential exchangeable for an access token), and an
+  # unexpected shape could also echo the submitted password back.
+  echo "NO_PENDING_TOKEN: unexpected login response (no .pendingToken field)" >&2
   exit 1
 fi
 
@@ -43,14 +62,16 @@ fi
 # 3. Accept terms -> converts the pendingToken into an access token and stamps
 #    user.termsAcceptedAt, so future logins skip the gate. Cookie jar carries
 #    the httpOnlyToken the controller binds the session to.
-accept_body="$(command curl -s -b "$JAR" -X POST "${BASE_URL}/api/access-tokens/accept-terms" \
-  -H 'Content-Type: application/json' \
-  -d "{\"pendingToken\":\"${pending}\",\"signature\":\"${sig}\"}")"
+accept_body="$(jq -n --arg pendingToken "$pending" --arg signature "$sig" \
+  '{pendingToken: $pendingToken, signature: $signature}' \
+  | command curl -s -b "$JAR" -X POST "${BASE_URL}/api/access-tokens/accept-terms" \
+      -H 'Content-Type: application/json' -d @-)"
 
 if echo "$accept_body" | jq -e '.item' >/dev/null 2>&1; then
   echo "ACCEPTED: terms accepted for ${EMAIL}; access token issued"
   exit 0
 fi
 
-echo "ACCEPT_FAILED: ${accept_body}"
+# Don't echo the raw body here either: it may still carry the pendingToken.
+echo "ACCEPT_FAILED: $(echo "$accept_body" | jq -c 'del(.pendingToken)' 2>/dev/null || echo '<unparseable response>')" >&2
 exit 1
