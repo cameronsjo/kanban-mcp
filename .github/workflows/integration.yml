@@ -43,14 +43,15 @@ jobs:
             echo "PLANKA_ADMIN_USERNAME=demo"
           } > .env
 
-      - name: Start Planka 2.1.1
+      - name: Start Planka (see docker-compose.yml for the pinned tag)
         run: npm run up
 
       - name: Wait for Planka to be ready
         run: bash scripts/wait-for-planka.sh "$PLANKA_BASE_URL" 120
 
       - name: Accept terms (provision first login)
-        run: bash scripts/accept-planka-terms.sh "$PLANKA_BASE_URL" "$PLANKA_AGENT_EMAIL" "$PLANKA_AGENT_PASSWORD"
+        # PLANKA_AGENT_PASSWORD is read from the job env above, never argv.
+        run: bash scripts/accept-planka-terms.sh "$PLANKA_BASE_URL" "$PLANKA_AGENT_EMAIL"
 
       - name: Integration tests
         run: npm run test:integration

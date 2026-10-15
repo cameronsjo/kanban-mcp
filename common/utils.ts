@@ -4,6 +4,12 @@ import { VERSION } from "./version.js";
 
 // Global variables to store tokens
 let agentToken: string | null = null;
+// Dedupes concurrent re-authentication: without this, N requests that all
+// see a 401 on the same expired token each trigger their own full
+// authenticateAgent() call (a password login + a new Planka session row
+// per call), and the request that installs a fresh token can have that
+// fresh token immediately cleared by a sibling still reacting to the old one.
+let authInFlight: Promise<string> | null = null;
 
 type RequestOptions = {
   method?: string;
@@ -11,6 +17,23 @@ type RequestOptions = {
   headers?: Record<string, string>;
   skipAuth?: boolean;
 };
+
+/**
+ * Strip userinfo (username:password@) before a URL reaches a log line or
+ * error message. `PLANKA_BASE_URL` is operator-configured, not attacker
+ * input, but a URL embedding basic-auth credentials should never round-trip
+ * into an error the calling model (or CI logs) can see.
+ */
+function redactUrlForLogging(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.username = "";
+    parsed.password = "";
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
 
 async function parseResponseBody(response: Response): Promise<unknown> {
   const contentType = response.headers.get("content-type");
@@ -81,10 +104,13 @@ async function authenticateAgent(): Promise<string> {
       (responseBody as { step?: string }).step === "accept-terms"
     ) {
       throw new Error(
-        "Planka requires terms-of-service acceptance for this account before an " +
-          "access token can be issued. Accept terms once (in the Planka UI, or " +
-          "run `scripts/accept-planka-terms.sh <baseUrl> <email> <password>`), " +
-          "then retry.",
+        "Planka requires terms-of-service acceptance for this agent account " +
+          "before an access token can be issued. This is an operator-side setup " +
+          "step, not something the calling model can complete: accept terms once " +
+          "in the Planka UI, or ask the operator to run " +
+          "`scripts/accept-planka-terms.sh` (it reads the password from the " +
+          "PLANKA_AGENT_PASSWORD env var or a stdin prompt, never a command-line " +
+          "argument), then retry.",
       );
     }
 
@@ -109,7 +135,14 @@ async function getAuthToken(): Promise<string> {
   if (agentToken) {
     return agentToken;
   }
-  return authenticateAgent();
+  // Concurrent callers share one in-flight login instead of each starting
+  // their own — see the authInFlight comment above.
+  if (!authInFlight) {
+    authInFlight = authenticateAgent().finally(() => {
+      authInFlight = null;
+    });
+  }
+  return authInFlight;
 }
 
 export async function plankaRequest(
@@ -145,9 +178,11 @@ export async function plankaRequest(
     }
 
     // Add authentication token if not skipped
+    let usedToken: string | undefined;
     if (!options.skipAuth) {
       try {
         const token = await getAuthToken();
+        usedToken = token;
         headers["Authorization"] = `Bearer ${token}`;
       } catch (error: unknown) {
         const errorMessage = error instanceof Error
@@ -177,15 +212,19 @@ export async function plankaRequest(
         ? error.message
         : String(error);
       throw new Error(
-        `Failed to make Planka request to ${url}: ${errorMessage}`,
+        `Failed to make Planka request to ${redactUrlForLogging(url)}: ${errorMessage}`,
       );
     }
 
     if (
       response.status === 401 && !options.skipAuth && attempt === 0 &&
-      agentToken
+      usedToken && agentToken === usedToken
     ) {
       // Cached token rejected — drop it and retry with a fresh login.
+      // Only clear when the CURRENT cached token is still the one THIS
+      // request used: a sibling request may have already refreshed
+      // agentToken to a new, valid value while this one was in flight, and
+      // clearing unconditionally would discard that fresh token too.
       agentToken = null;
       continue;
     }
@@ -193,7 +232,7 @@ export async function plankaRequest(
     if (!response.ok) {
       const plankaError = createPlankaError(response.status, responseBody);
       throw new Error(
-        `Failed to make Planka request to ${url}: ${plankaError.message}`,
+        `Failed to make Planka request to ${redactUrlForLogging(url)}: ${plankaError.message}`,
       );
     }
 
@@ -202,7 +241,7 @@ export async function plankaRequest(
 
   // Unreachable: every path inside the loop returns or throws.
   throw new Error(
-    `Failed to make Planka request to ${url}: authentication retry exhausted`,
+    `Failed to make Planka request to ${redactUrlForLogging(url)}: authentication retry exhausted`,
   );
 }
 

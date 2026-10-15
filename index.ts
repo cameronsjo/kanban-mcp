@@ -20,12 +20,8 @@ import {
   getCardDetails,
 } from "./tools/index.js";
 
+import { plankaId } from "./common/schemas.js";
 import { VERSION } from "./common/version.js";
-
-// Planka entity IDs are numeric snowflakes. Validating client-supplied IDs at
-// the tool boundary rejects path-traversal / cross-resource injection (e.g. an
-// id like "1/../../users") before it is ever interpolated into an API path.
-const plankaId = z.string().regex(/^\d+$/, "must be a numeric Planka ID");
 
 const server = new McpServer(
   {
@@ -68,8 +64,7 @@ server.tool(
       .optional()
       .describe("The page number for pagination (1-indexed)"),
     perPage: z.number().optional().describe("The number of items per page"),
-    boardId: z
-      .string()
+    boardId: plankaId
       .optional()
       .describe("The ID of the board to get a summary for"),
     includeTaskDetails: z
@@ -281,8 +276,7 @@ server.tool(
       .string()
       .optional()
       .describe("Optional comment to add to the card"),
-    cardId: z
-      .string()
+    cardId: plankaId
       .optional()
       .describe("The ID of the card to get details for"),
   },
@@ -445,8 +439,7 @@ server.tool(
     id: plankaId.optional().describe("The ID of the label"),
     boardId: plankaId.optional().describe("The ID of the board"),
     cardId: plankaId.optional().describe("The ID of the card"),
-    labelId: z
-      .string()
+    labelId: plankaId
       .optional()
       .describe("The ID of the label (for card operations)"),
     name: z.string().optional().describe("The name of the label"),
