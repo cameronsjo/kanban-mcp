@@ -16,7 +16,7 @@ import (
 // than an opaque permission error. login does NOT cache; ensureToken owns the
 // cache so the singleflight re-check and store stay in one place.
 func (c *Client) login(ctx context.Context) (string, error) {
-	logger.Debug("Preparing to login agent", "email", c.email, "baseURL", c.baseURL)
+	logger.Debug("Preparing to login agent", "email", c.email, "baseURL", RedactURLForLogging(c.baseURL))
 
 	url := c.baseURL + "/api/access-tokens"
 	payload, err := json.Marshal(map[string]string{
@@ -24,14 +24,14 @@ func (c *Client) login(ctx context.Context) (string, error) {
 		"password":        c.password,
 	})
 	if err != nil {
-		logger.Error("Failed to marshal login body", "email", c.email, "error", err.Error())
+		logger.Error("Failed to marshal login body", "email", c.email, "error", redactErrorForLogging(err))
 		return "", fmt.Errorf("marshal login body: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
 	if err != nil {
-		logger.Error("Failed to build login request", "email", c.email, "error", err.Error())
-		return "", fmt.Errorf("build login request: %w", err)
+		logger.Error("Failed to build login request", "email", c.email, "error", redactErrorForLogging(err))
+		return "", wrapRedactedURLError("build login request", url, err)
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
@@ -39,14 +39,14 @@ func (c *Client) login(ctx context.Context) (string, error) {
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		logger.Error("Failed to authenticate agent with Planka", "email", c.email, "error", err.Error())
-		return "", fmt.Errorf("authenticate agent with Planka: %w", err)
+		logger.Error("Failed to authenticate agent with Planka", "email", c.email, "error", redactErrorForLogging(err))
+		return "", wrapRedactedURLError("authenticate agent with Planka", url, err)
 	}
 	body, readErr := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
 	if readErr != nil {
-		logger.Error("Failed to read login response", "email", c.email, "error", readErr.Error())
-		return "", fmt.Errorf("read login response: %w", readErr)
+		logger.Error("Failed to read login response", "email", c.email, "error", redactErrorForLogging(readErr))
+		return "", wrapRedactedURLError("read login response from", url, readErr)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -66,7 +66,7 @@ func (c *Client) login(ctx context.Context) (string, error) {
 		Item string `json:"item"`
 	}
 	if err := json.Unmarshal(body, &env); err != nil {
-		logger.Error("Failed to decode login response", "email", c.email, "error", err.Error())
+		logger.Error("Failed to decode login response", "email", c.email, "error", redactErrorForLogging(err))
 		return "", fmt.Errorf("decode login response: %w", err)
 	}
 	if env.Item == "" {

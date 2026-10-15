@@ -30,7 +30,7 @@ var labelActions = []string{"get_all", "create", "update", "delete", "add_to_car
 func registerLabelManager(server *mcp.Server, client *planka.Client) error {
 	schema, err := inferSchema[labelArgs](
 		applyEnum("action", labelActions),
-		applyIDPattern("id", "boardId", "cardId"),
+		applyIDPattern("id", "boardId", "cardId", "labelId"),
 		applyEnum("color", labelColors),
 	)
 	if err != nil {

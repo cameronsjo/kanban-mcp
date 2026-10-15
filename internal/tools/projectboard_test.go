@@ -284,11 +284,9 @@ func TestGetBoardSummaryRequiresBoardID(t *testing.T) {
 	}
 }
 
-// TestGetBoardSummaryBoardIdHardenedAtLayerB locks the security fix: boardId
-// carries NO schema pattern (Layer A — the golden test's noPattern list keeps
-// zod parity), but the handler rejects a non-numeric boardId (Layer B requireID)
-// so it cannot traverse into a privileged Planka path (e.g. boardSummary →
-// GET /api/boards/<boardId>).
+// TestGetBoardSummaryBoardIdHardenedAtLayerB locks the handler-side backstop
+// for boardId so it cannot traverse into a privileged Planka path (for example
+// boardSummary → GET /api/boards/<boardId>).
 func TestGetBoardSummaryBoardIdHardenedAtLayerB(t *testing.T) {
 	c := newToolClient(t, &mockPlanka{})
 	_, err := dispatchProjectBoard(context.Background(), c, projectBoardArgs{

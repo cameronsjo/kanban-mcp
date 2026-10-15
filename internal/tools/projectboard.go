@@ -41,10 +41,10 @@ var projectBoardActions = []string{
 }
 
 func registerProjectBoardManager(server *mcp.Server, client *planka.Client) error {
-	// Layer A: applyIDPattern("id", "projectId") — boardId is plain z.string, NOT hardened.
+	// Layer A: all three project/board ID fields are plankaId fields in the TS schema.
 	schema, err := inferSchema[projectBoardArgs](
 		applyEnum("action", projectBoardActions),
-		applyIDPattern("id", "projectId"),
+		applyIDPattern("id", "projectId", "boardId"),
 	)
 	if err != nil {
 		return err

@@ -27,8 +27,7 @@ func goldenSchemas() map[string]schemaExpect {
 	return map[string]schemaExpect{
 		"mcp_kanban_project_board_manager": {
 			actions:   []string{"get_projects", "get_project", "get_boards", "create_board", "get_board", "update_board", "delete_board", "get_board_summary"},
-			idPattern: []string{"id", "projectId"},
-			noPattern: []string{"boardId"},
+			idPattern: []string{"id", "projectId", "boardId"},
 			required:  []string{"action"},
 		},
 		"mcp_kanban_list_manager": {
@@ -39,8 +38,8 @@ func goldenSchemas() map[string]schemaExpect {
 		},
 		"mcp_kanban_card_manager": {
 			actions:   []string{"get_all", "create", "get_one", "update", "move", "duplicate", "delete", "create_with_tasks", "get_details"},
-			idPattern: []string{"id", "listId"},
-			noPattern: []string{"boardId", "projectId", "cardId"},
+			idPattern: []string{"id", "listId", "cardId"},
+			noPattern: []string{"boardId", "projectId"},
 			required:  []string{"action"},
 		},
 		"mcp_kanban_stopwatch": {
@@ -50,8 +49,7 @@ func goldenSchemas() map[string]schemaExpect {
 		},
 		"mcp_kanban_label_manager": {
 			actions:   []string{"get_all", "create", "update", "delete", "add_to_card", "remove_from_card"},
-			idPattern: []string{"id", "boardId", "cardId"},
-			noPattern: []string{"labelId"},
+			idPattern: []string{"id", "boardId", "cardId", "labelId"},
 			enums:     map[string][]string{"color": labelColors},
 			required:  []string{"action"},
 		},

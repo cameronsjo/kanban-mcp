@@ -6,10 +6,8 @@ import (
 	"testing"
 )
 
-// These lock the path-traversal hardening: the label/card/board ID fields carry
-// no schema pattern (Layer A parity with zod — see schema_golden_test.go's
-// noPattern lists), but the handler rejects a non-numeric value (Layer B
-// requireID) before it can be interpolated into a privileged Planka path.
+// These lock the path-traversal hardening at Layer B. The schema golden tests
+// also require the current TS plankaId pattern at Layer A for these fields.
 
 func TestLabelRemoveRejectsNonNumericLabelID(t *testing.T) {
 	c := newToolClient(t, &mockPlanka{})

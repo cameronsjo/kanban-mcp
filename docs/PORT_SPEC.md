@@ -62,7 +62,7 @@ the TypeScript server's behavior. Cross-check each function against the named
 Tool name: `mcp_kanban_project_board_manager`
 Description: `Manage projects and boards with various operations`
 Actions: `get_projects, get_project, get_boards, create_board, get_board, update_board, delete_board, get_board_summary`
-Layer-A IDs: `applyIDPattern("id", "projectId")`  (NOTE: `boardId` here is plain z.string — do NOT harden it.)
+Layer-A IDs: `applyIDPattern("id", "projectId", "boardId")` (all three are `plankaId` fields in the current `index.ts`).
 No value enums beyond action. `type` is plain string.
 
 `xArgs` fields: Action; ID*, ProjectID* (plankaId); Name*; Position*float64;
@@ -110,7 +110,7 @@ IncludeComments*bool.
 - get_board: requireID("id"); GetBoard.
 - update_board: require id(requireID), name(requireName), Position present; UpdateBoard with Name+Position (and Type if set).
 - delete_board: requireID("id"); DeleteBoard.
-- get_board_summary: requireString("boardId") (boardId is z.string here, presence only); `boardSummary(ctx, client, boardID, deref(args.IncludeTaskDetails, false), deref(args.IncludeComments, false))` (the composite stub already exists).
+- get_board_summary: requireID("boardId"); `boardSummary(ctx, client, boardID, deref(args.IncludeTaskDetails, false), deref(args.IncludeComments, false))` (the composite stub already exists).
 
 ---
 
@@ -118,8 +118,8 @@ IncludeComments*bool.
 
 Tool: `mcp_kanban_card_manager`  Desc: `Manage kanban cards with various operations`
 Actions: `get_all, create, get_one, update, move, duplicate, delete, create_with_tasks, get_details`
-Layer-A IDs: `applyIDPattern("id", "listId")`  (boardId, projectId, cardId here are plain z.string — do NOT harden.)
-`xArgs`: Action; ID*, ListId* (plankaId); BoardID*, ProjectID*, CardID* (plain); Name*; Description*; Position*float64; DueDate*; IsCompleted*bool; Tasks*[]string; Comment*.
+Layer-A IDs: `applyIDPattern("id", "listId", "cardId")` (boardId and projectId remain plain `z.string()` fields here.)
+`xArgs`: Action; ID*, ListId*, CardID* (plankaId); BoardID*, ProjectID* (plain); Name*; Description*; Position*float64; DueDate*; IsCompleted*bool; Tasks*[]string; Comment*.
 
 ### planka/cards.go
 - `type CreateCardOptions struct { ListID, Name, Description string; Position float64; Type string }`
@@ -155,7 +155,7 @@ Layer-A IDs: `applyIDPattern("id", "listId")`  (boardId, projectId, cardId here 
 - duplicate: require id(requireID), Position present; `DuplicateCard(id, *Position)`.
 - delete: requireID("id"); DeleteCard.
 - create_with_tasks: require listId(requireID), name(requireName); `createCardWithTasks(ctx, client, CreateCardWithTasksParams{ListID: listId, Name: name, Description, Tasks: deref(Tasks,nil), Comment, Position})` (composite stub exists).
-- get_details: requireString("cardId"); `cardDetails(ctx, client, cardID)` (composite stub exists).
+- get_details: requireID("cardId"); `cardDetails(ctx, client, cardID)` (composite stub exists).
 
 ---
 
@@ -205,9 +205,9 @@ elapsed seconds = `int(time.Since(parsed).Seconds())`, parsed via
 
 Tool: `mcp_kanban_label_manager`  Desc: `Manage kanban labels with various operations`
 Actions: `get_all, create, update, delete, add_to_card, remove_from_card`
-Layer-A IDs: `applyIDPattern("id", "boardId", "cardId")`  (labelId is plain z.string — do NOT harden.)
+Layer-A IDs: `applyIDPattern("id", "boardId", "cardId", "labelId")` (all four are `plankaId` fields in the current `index.ts`).
 Value enum: `applyEnum("color", labelColors)`.
-`xArgs`: Action; ID*, BoardID*, CardID* (plankaId); LabelId* (plain); Name*; Color*; Position*float64.
+`xArgs`: Action; ID*, BoardID*, CardID*, LabelId* (plankaId); Name*; Color*; Position*float64.
 
 ### planka/labels.go
 - `type CreateLabelOptions struct { BoardID, Name, Color string; Position float64 }`

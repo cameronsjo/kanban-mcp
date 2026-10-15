@@ -95,8 +95,11 @@ func extractMessage(body []byte) string {
 // message is actionable, mirroring authenticateAgent in common/utils.ts.
 var ErrTermsNotAccepted = errors.New(
 	"Planka requires terms-of-service acceptance for this account before an " +
-		"access token can be issued. Accept terms once (in the Planka UI, or run " +
-		"scripts/accept-planka-terms.sh <baseUrl> <email> <password>), then retry.",
+		"access token can be issued. This is an operator-side setup step, not " +
+		"something the calling model can complete: accept terms once in the Planka " +
+		"UI, or ask the operator to run scripts/accept-planka-terms.sh (it reads " +
+		"the password from the PLANKA_AGENT_PASSWORD environment variable or a " +
+		"stdin prompt, never a command-line argument), then retry.",
 )
 
 // IsNotFound reports whether err is (or wraps) a 404 APIError. Composites use

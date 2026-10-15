@@ -36,7 +36,7 @@ var cardActions = []string{
 func registerCardManager(server *mcp.Server, client *planka.Client) error {
 	schema, err := inferSchema[cardArgs](
 		applyEnum("action", cardActions),
-		applyIDPattern("id", "listId"),
+		applyIDPattern("id", "listId", "cardId"),
 	)
 	if err != nil {
 		return err

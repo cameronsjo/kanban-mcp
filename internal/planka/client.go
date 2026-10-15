@@ -13,10 +13,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -27,6 +29,70 @@ import (
 )
 
 var logger = slog.Default()
+
+// RedactURLForLogging removes URL userinfo before an operator-configured URL
+// reaches an error or log line. A malformed URL is handled conservatively by
+// removing the userinfo segment when it can still be identified.
+func RedactURLForLogging(raw string) string {
+	parsed, err := url.Parse(raw)
+	if err == nil {
+		parsed.User = nil
+		return parsed.String()
+	}
+	return redactRawURLUserinfo(raw)
+}
+
+func redactRawURLUserinfo(raw string) string {
+	schemeEnd := strings.Index(raw, "://")
+	if schemeEnd < 0 {
+		return raw
+	}
+	authorityStart := schemeEnd + 3
+	authorityEnd := len(raw)
+	if i := strings.IndexAny(raw[authorityStart:], "/?#"); i >= 0 {
+		authorityEnd = authorityStart + i
+	}
+	authority := raw[authorityStart:authorityEnd]
+	at := strings.LastIndexByte(authority, '@')
+	if at < 0 {
+		return raw
+	}
+	return raw[:authorityStart] + authority[at+1:] + raw[authorityEnd:]
+}
+
+// redactErrorForLogging renders an error without allowing url.Error's default
+// Error string to re-emit URL userinfo.
+func redactErrorForLogging(err error) string {
+	if err == nil {
+		return ""
+	}
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		message := urlErr.Op + " " + fmt.Sprintf("%q", RedactURLForLogging(urlErr.URL))
+		if urlErr.Err != nil {
+			message += ": " + redactErrorForLogging(urlErr.Err)
+		}
+		return message
+	}
+	return redactRawURLUserinfo(err.Error())
+}
+
+type redactedError struct {
+	message string
+	cause   error
+}
+
+// redactedError preserves errors.Is/errors.As through the sanitized message.
+func (e *redactedError) Error() string { return e.message }
+func (e *redactedError) Unwrap() error { return e.cause }
+
+func wrapRedactedURLError(prefix, rawURL string, cause error) error {
+	message := prefix + " " + RedactURLForLogging(rawURL)
+	if cause != nil {
+		message += ": " + redactErrorForLogging(cause)
+	}
+	return &redactedError{message: message, cause: cause}
+}
 
 // Client is a Planka API client. It is safe for concurrent use and is intended
 // to be constructed once and shared across all MCP sessions so the token cache
@@ -105,7 +171,7 @@ func (c *Client) do(ctx context.Context, method, path string, body, out any) err
 		var err error
 		payload, err = json.Marshal(body)
 		if err != nil {
-			logger.Debug("Failed to marshal request body", "path", path, "error", err.Error())
+			logger.Debug("Failed to marshal request body", "path", path, "error", redactErrorForLogging(err))
 			return fmt.Errorf("marshal request body: %w", err)
 		}
 	}
@@ -122,8 +188,8 @@ func (c *Client) do(ctx context.Context, method, path string, body, out any) err
 		}
 		req, err := http.NewRequestWithContext(ctx, method, url, reqBody)
 		if err != nil {
-			logger.Debug("Failed to build request", "path", path, "error", err.Error())
-			return fmt.Errorf("build request: %w", err)
+			logger.Debug("Failed to build request", "path", path, "error", redactErrorForLogging(err))
+			return wrapRedactedURLError("build request", url, err)
 		}
 		req.Header.Set("Accept", "application/json")
 		if payload != nil {
@@ -134,14 +200,14 @@ func (c *Client) do(ctx context.Context, method, path string, body, out any) err
 
 		resp, err := c.http.Do(req)
 		if err != nil {
-			logger.Debug("Request failed", "method", method, "path", path, "error", err.Error())
-			return fmt.Errorf("planka request to %s: %w", url, err)
+			logger.Debug("Request failed", "method", method, "path", path, "error", redactErrorForLogging(err))
+			return wrapRedactedURLError("planka request to", url, err)
 		}
 		respBody, readErr := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 		if readErr != nil {
-			logger.Debug("Failed to read response", "path", path, "error", readErr.Error())
-			return fmt.Errorf("read response from %s: %w", url, readErr)
+			logger.Debug("Failed to read response", "path", path, "error", redactErrorForLogging(readErr))
+			return wrapRedactedURLError("read response from", url, readErr)
 		}
 
 		// A cached token rejected on the first attempt: drop it (only if it is
@@ -159,8 +225,8 @@ func (c *Client) do(ctx context.Context, method, path string, body, out any) err
 
 		if out != nil {
 			if err := json.Unmarshal(respBody, out); err != nil {
-				logger.Debug("Failed to decode response", "path", path, "error", err.Error())
-				return fmt.Errorf("decode response from %s: %w", url, err)
+				logger.Debug("Failed to decode response", "path", path, "error", redactErrorForLogging(err))
+				return wrapRedactedURLError("decode response from", url, err)
 			}
 		}
 		return nil
@@ -203,7 +269,7 @@ func (c *Client) ensureToken(ctx context.Context) (string, error) {
 		return tok, nil
 	})
 	if err != nil {
-		logger.Debug("Failed to ensure token", "error", err.Error())
+		logger.Debug("Failed to ensure token", "error", redactErrorForLogging(err))
 		return "", err
 	}
 	return v.(string), nil
