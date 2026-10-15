@@ -119,7 +119,7 @@ type Comment struct {
 	CardID    string  `json:"cardId,omitempty"`
 	UserID    string  `json:"userId,omitempty"`
 	CreatedAt string  `json:"createdAt,omitempty"`
-	UpdatedAt *string `json:"updatedAt,omitempty"`
+	UpdatedAt *string `json:"updatedAt"`
 }
 
 // BoardMembership ports the board-membership entity. role is a free string

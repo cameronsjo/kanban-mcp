@@ -1,10 +1,9 @@
 # Migrating from the per-session TypeScript server to the shared Go daemon
 
 The TypeScript server is spawned **once per Claude Code session over stdio**.
-Each Node process idles at ~50 MB RSS, so N concurrent sessions cost ~N × 50 MB.
-The Go server replaces those N processes with **one** long-lived
-Streamable-HTTP daemon every session shares — flat RSS regardless of session
-count.
+The Go server provides **one** long-lived Streamable-HTTP daemon that sessions
+can share, including its Planka token cache. Actual memory savings require
+measurement with the intended workload.
 
 ## 1. Build / install the binary
 
@@ -81,16 +80,16 @@ npx -y @modelcontextprotocol/inspector
 # connect to http://127.0.0.1:8900/mcp
 ```
 
-Memory acceptance (not measured by this change): With several Claude sessions open against the Go
-server, confirm exactly one process and flat RSS:
+Memory acceptance (not measured by this change): with several sessions open,
+measure the daemon’s resident memory before and after concurrent use:
 
 ```bash
 pgrep -fl kanban-mcp                 # expect ONE pid
-ps -o rss= -p "$(pgrep -f kanban-mcp | head -1)"   # KB; stays ~12–20 MB flat
+ps -o rss= -p "$(pgrep -f kanban-mcp | head -1)"   # measured KB
 ```
 
-Compare against the TS baseline: summed RSS of the per-session `node` processes
-(`pgrep -fl 'dist/index.js' | wc -l` × ~50 MB).
+Compare against the measured summed RSS of the per-session TypeScript processes
+under the same workload. Process count alone does not prove a memory saving.
 
 
 ## Acceptance limits

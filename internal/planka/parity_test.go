@@ -3,6 +3,8 @@ package planka
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"sync"
 	"testing"
 )
 
@@ -145,5 +147,82 @@ func TestGetCardStopwatchStoppedIncludesNullStartedAt(t *testing.T) {
 	startedAt, present := got["startedAt"]
 	if !present || startedAt != nil {
 		t.Fatalf("startedAt = (%#v, present=%v), want present nil", startedAt, present)
+	}
+}
+
+func TestGetListsNormalizesMissingOrNullListsToEmptyArray(t *testing.T) {
+	for _, body := range []string{
+		`{"item":{"id":"B1"},"included":{}}`,
+		`{"item":{"id":"B1"},"included":{"lists":null}}`,
+	} {
+		t.Run(body, func(t *testing.T) {
+			m := &mockPlanka{
+				tokens: []string{"tok"},
+				handler: func(token string, r recordedRequest) (int, string) {
+					return 200, body
+				},
+			}
+			c, _ := newTestClient(t, m)
+
+			lists, err := c.GetLists(context.Background(), "B1")
+			if err != nil {
+				t.Fatalf("GetLists: %v", err)
+			}
+			wire, err := json.Marshal(lists)
+			if err != nil {
+				t.Fatalf("json.Marshal: %v", err)
+			}
+			if string(wire) != "[]" {
+				t.Fatalf("lists JSON = %s, want []", wire)
+			}
+		})
+	}
+}
+
+func TestCommentMarshalPreservesNullUpdatedAt(t *testing.T) {
+	var comment Comment
+	if err := json.Unmarshal([]byte(`{"id":"C1","text":"hello","updatedAt":null}`), &comment); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+	wire, err := json.Marshal(comment)
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+	var fields map[string]any
+	if err := json.Unmarshal(wire, &fields); err != nil {
+		t.Fatalf("json.Unmarshal marshaled comment: %v", err)
+	}
+	updatedAt, present := fields["updatedAt"]
+	if !present || updatedAt != nil {
+		t.Fatalf("comment JSON = %s, want present updatedAt:null", wire)
+	}
+}
+
+func TestTaskCardCacheConcurrentReadWrite(t *testing.T) {
+	c := &Client{}
+	const n = 64
+	var wg sync.WaitGroup
+	wg.Add(2 * n)
+	start := make(chan struct{})
+	for i := 0; i < n; i++ {
+		i := i
+		go func() {
+			defer wg.Done()
+			<-start
+			c.rememberTaskCard(fmt.Sprintf("T%d", i), fmt.Sprintf("C%d", i))
+		}()
+		go func() {
+			defer wg.Done()
+			<-start
+			_ = c.taskCardID(fmt.Sprintf("T%d", i))
+		}()
+	}
+	close(start)
+	wg.Wait()
+
+	for i := 0; i < n; i++ {
+		if got := c.taskCardID(fmt.Sprintf("T%d", i)); got != fmt.Sprintf("C%d", i) {
+			t.Fatalf("task T%d maps to %q, want C%d", i, got, i)
+		}
 	}
 }

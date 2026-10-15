@@ -77,6 +77,80 @@ func TestTaskCreateHappyPath(t *testing.T) {
 	}
 }
 
+func TestTaskCreateThenGetOneUsesRememberedCardID(t *testing.T) {
+	cardGets := 0
+	m := &mockPlanka{respond: func(r capturedRequest) (int, string) {
+		switch {
+		case r.Method == "GET" && r.Path == "/api/cards/42":
+			cardGets++
+			if cardGets == 1 {
+				return 200, cardWithTaskListJSON("7")
+			}
+			return 200, cardWithTasksJSON("99")
+		case r.Method == "POST" && r.Path == "/api/task-lists/7/tasks":
+			return 200, `{"item":{"id":"99","name":"Created","isCompleted":false,"position":65535}}`
+		}
+		return 404, `{"message":"unexpected"}`
+	}}
+	c := newToolClient(t, m)
+
+	created, err := dispatchTask(context.Background(), c, taskArgs{
+		Action: "create", CardID: sp("42"), Name: sp("Created"), Position: fp(65535),
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if task, ok := created.(*planka.Task); !ok || task.ID != "99" {
+		t.Fatalf("create result = %#v, want task 99", created)
+	}
+
+	got, err := dispatchTask(context.Background(), c, taskArgs{
+		Action: "get_one", ID: sp("99"),
+	})
+	if err != nil {
+		t.Fatalf("get_one after create: %v", err)
+	}
+	task, ok := got.(*planka.Task)
+	if !ok || task.ID != "99" {
+		t.Fatalf("get_one result = %#v, want task 99", got)
+	}
+	if cardGets != 2 {
+		t.Fatalf("card GETs = %d, want create lookup plus cached get_one lookup", cardGets)
+	}
+}
+
+func TestTaskFailedCreateDoesNotRememberCardID(t *testing.T) {
+	cardGets := 0
+	m := &mockPlanka{respond: func(r capturedRequest) (int, string) {
+		switch {
+		case r.Method == "GET" && r.Path == "/api/cards/42":
+			cardGets++
+			return 200, cardWithTaskListJSON("7")
+		case r.Method == "POST" && r.Path == "/api/task-lists/7/tasks":
+			return 500, `{"message":"create failed"}`
+		}
+		return 404, `{"message":"unexpected"}`
+	}}
+	c := newToolClient(t, m)
+
+	_, err := dispatchTask(context.Background(), c, taskArgs{
+		Action: "create", CardID: sp("42"), Name: sp("Failed"), Position: fp(65535),
+	})
+	if err == nil {
+		t.Fatal("create returned nil error")
+	}
+
+	_, err = dispatchTask(context.Background(), c, taskArgs{
+		Action: "get_one", ID: sp("99"),
+	})
+	if err == nil || !strings.Contains(err.Error(), "Card ID is required") {
+		t.Fatalf("get_one after failed create = %v, want missing-card error", err)
+	}
+	if cardGets != 1 {
+		t.Fatalf("card GETs = %d, want only failed create lookup", cardGets)
+	}
+}
+
 func TestTaskCreateMissingCardIDErrors(t *testing.T) {
 	c := newToolClient(t, &mockPlanka{})
 	_, err := dispatchTask(context.Background(), c, taskArgs{

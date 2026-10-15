@@ -73,6 +73,9 @@ func (c *Client) CreateTask(ctx context.Context, cardID, name string, position f
 	if err := c.Post(ctx, "/api/task-lists/"+tlID+"/tasks", body, &env); err != nil {
 		return nil, err
 	}
+	if env.Item.ID != "" {
+		c.rememberTaskCard(env.Item.ID, cardID)
+	}
 	return &env.Item, nil
 }
 
@@ -93,6 +96,9 @@ func (c *Client) GetTasks(ctx context.Context, cardID string) ([]Task, error) {
 // Mirrors getTask in tasks.ts. PROPAGATE.
 func (c *Client) GetTask(ctx context.Context, id, cardID string) (*Task, error) {
 	if cardID == "" {
+		cardID = c.taskCardID(id)
+	}
+	if cardID == "" {
 		return nil, fmt.Errorf(
 			"Card ID is required to get a task. Either provide it directly or create the task first.",
 		)
@@ -110,6 +116,25 @@ func (c *Client) GetTask(ctx context.Context, id, cardID string) (*Task, error) 
 		}
 	}
 	return nil, fmt.Errorf("Task with ID %s not found in card %s", id, cardID)
+}
+
+func (c *Client) rememberTaskCard(taskID, cardID string) {
+	if taskID == "" || cardID == "" {
+		return
+	}
+	c.taskMu.Lock()
+	if c.taskCardIDs == nil {
+		c.taskCardIDs = make(map[string]string)
+	}
+	c.taskCardIDs[taskID] = cardID
+	c.taskMu.Unlock()
+}
+
+func (c *Client) taskCardID(taskID string) string {
+	c.taskMu.RLock()
+	cardID := c.taskCardIDs[taskID]
+	c.taskMu.RUnlock()
+	return cardID
 }
 
 // UpdateTask patches a task's mutable fields. Mirrors updateTask in tasks.ts.

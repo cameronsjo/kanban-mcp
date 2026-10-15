@@ -256,13 +256,15 @@ Tasks*[]taskBatchItem where `taskBatchItem struct { CardID string \`json:"cardId
   return created item id. PROPAGATE.
 - `func (c *Client) CreateTask(ctx, cardID, name string, position float64) (*Task, error)` —
   `tlID,_ := ensureTaskListID(cardID)` (propagate); POST `/api/task-lists/{tlID}/tasks`
-  body `{name, position}`; return item. (No taskCardId map needed in Go — getTask
-  takes an explicit cardId; see below.)
+  body `{name, position}`; return item. After a successful response with a non-empty
+  task ID, remember the task ID → card ID mapping on the client under a mutex so
+  `GetTask(ctx, id, "")` can resolve the owning card.
 - `func (c *Client) GetTasks(ctx, cardID string) ([]Task, error)` — GET
   `/api/cards/{cardId}`; return `included.Tasks` or `[]Task{}`; SWALLOW errors → `[]Task{}`.
-- `func (c *Client) GetTask(ctx, id, cardID string) (*Task, error)` — if cardID=="" →
-  error "Card ID is required to get a task. Either provide it directly or create
-  the task first."; GET `/api/cards/{cardId}`; if no `included.Tasks` → error
+- `func (c *Client) GetTask(ctx, id, cardID string) (*Task, error)` — if cardID=="",
+  consult the successful-create task ID → card ID cache; if it still cannot resolve
+  a card, return error "Card ID is required to get a task. Either provide it directly
+  or create the task first."; GET `/api/cards/{cardId}`; if no `included.Tasks` → error
   "Failed to get tasks for card {cardId}"; find task by id; if not found → error
   "Task with ID {id} not found in card {cardId}"; return it. PROPAGATE.
 - `func (c *Client) UpdateTask(ctx, id string, name *string, isCompleted *bool, position *float64) (*Task, error)` —
@@ -283,7 +285,9 @@ Tasks*[]taskBatchItem where `taskBatchItem struct { CardID string \`json:"cardId
 - create: require cardId(requireID), name(requireName); `CreateTask(cardID, name, deref(Position, 65535))`.
 - batch_create: require Tasks non-empty (else "tasks array is required for batch_create action");
   map xArgs taskBatchItem → planka.BatchTaskInput; `BatchCreateTasks`.
-- get_one: requireID("id"); `GetTask(id, "")` (no cardId in this tool → pass ""; GetTask errors per TS).
+- get_one: requireID("id"); `GetTask(id, "")` (the tool has no cardId field;
+  GetTask resolves the card from a successful-create cache and otherwise returns
+  the TS missing-card error).
 - update: requireID("id"); UpdateTask with set fields.
 - complete_task: requireID("id"); `UpdateTask(id, nil, bp(true)... )` i.e. isCompleted=true only.
 - delete: requireID("id"); DeleteTask.

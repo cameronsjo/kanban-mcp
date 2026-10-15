@@ -124,6 +124,12 @@ type Client struct {
 	// adminMu guards the lazily-resolved admin user id.
 	adminMu     sync.Mutex
 	adminUserID string
+
+	// taskMu guards the lazily-initialized task ID to card ID cache. Planka v2
+	// only exposes tasks through their owning card, so GetTask needs this map
+	// when callers omit cardID after a successful CreateTask.
+	taskMu      sync.RWMutex
+	taskCardIDs map[string]string
 }
 
 // NewClient builds a Client from configuration. version flows into the

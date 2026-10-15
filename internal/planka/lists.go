@@ -25,6 +25,9 @@ func (c *Client) GetLists(ctx context.Context, boardID string) ([]List, error) {
 		return []List{}, nil
 	}
 	if env.Included != nil {
+		if env.Included.Lists == nil {
+			return []List{}, nil
+		}
 		return env.Included.Lists, nil
 	}
 	return []List{}, nil

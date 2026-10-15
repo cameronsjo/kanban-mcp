@@ -90,7 +90,8 @@ func dispatchTask(ctx context.Context, client *planka.Client, args taskArgs) (an
 		if err != nil {
 			return nil, err
 		}
-		// No cardId in this tool's schema — pass "" and GetTask errors per TS.
+		// No cardId is exposed in this tool; GetTask resolves the card from a
+		// successful create cache and retains the TS missing-card error otherwise.
 		return client.GetTask(ctx, id, "")
 
 	case "update":
