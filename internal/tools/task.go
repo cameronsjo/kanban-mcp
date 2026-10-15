@@ -77,8 +77,12 @@ func dispatchTask(ctx context.Context, client *planka.Client, args taskArgs) (an
 		}
 		inputs := make([]planka.BatchTaskInput, len(*args.Tasks))
 		for i, t := range *args.Tasks {
+			cardID, err := requireID(fmt.Sprintf("tasks[%d].cardId", i), &t.CardID)
+			if err != nil {
+				return nil, err
+			}
 			inputs[i] = planka.BatchTaskInput{
-				CardID:   t.CardID,
+				CardID:   cardID,
 				Name:     t.Name,
 				Position: t.Position,
 			}

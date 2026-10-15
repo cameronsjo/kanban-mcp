@@ -15,6 +15,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 // Transport selects how the server speaks MCP.
@@ -108,8 +109,8 @@ func (c Config) ValidateHTTP() error {
 		return errors.New("HTTP listen host must not contain surrounding whitespace")
 	}
 	if c.AllowRemote {
-		if strings.TrimSpace(c.AuthToken) == "" {
-			return errors.New("--allow-remote requires PLANKA_MCP_AUTH_TOKEN to be nonblank")
+		if utf8.RuneCountInString(strings.TrimSpace(c.AuthToken)) < 32 {
+			return errors.New("--allow-remote requires PLANKA_MCP_AUTH_TOKEN with at least 32 characters after trimming surrounding whitespace")
 		}
 	} else {
 		ip := net.ParseIP(host)

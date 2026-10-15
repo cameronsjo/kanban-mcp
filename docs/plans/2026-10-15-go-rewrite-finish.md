@@ -22,11 +22,13 @@ Cameron explicitly requested these six fixes after the reviews at `0d3e24c`:
 
 - [x] Gate release publication on a same-workflow read-only test job with race tests, vet, and version-pinned govulncheck.
 - [x] Pin govulncheck in ordinary Go CI to the same version.
-- [ ] Revalidate every batch task card ID before any Planka request.
-- [ ] Require remote tokens of at least 32 characters and document TLS in front of LAN binds.
-- [ ] Refuse login redirects without changing ordinary API request redirects.
-- [ ] Move launchd template log paths into the operator’s absolute Library/Logs directory.
+- [x] Revalidate every batch task card ID before any Planka request.
+- [x] Require remote tokens of at least 32 characters and document TLS in front of LAN binds.
+- [x] Refuse login redirects without changing ordinary API request redirects.
+- [x] Move launchd template log paths into the operator’s absolute Library/Logs directory.
 
 Keep PR #4 open/ready, push only the fork feature ref, and update the orchestrator report. No release/deployment is authorized.
 
 Release-policy review: the committed regression guard accepts only the explicit single-line required commands and default shell/success semantics; deliberate dependency, scanner, skip, suppression, script-block and shell-override mutants fail. Native actionlint and independent security closure passed. This structural guard is not a general YAML security parser.
+
+Posted-review verification: exact Go 1.26.9 full race suite, vet/build, pinned govulncheck v1.9.0, all four cross-builds and rebuilt CLI acceptance passed. New token/batch/redirect/log-path regressions were deliberately broken, restored exactly and rerun green. Plutil validates the template; no launchd service was installed. Fresh independent code and security review findings are closed.

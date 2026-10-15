@@ -3,10 +3,13 @@
   launchd user agent for the kanban-mcp Streamable-HTTP daemon.
 
   Install:
-    1. Edit the EnvironmentVariables below (or source them another way).
-    2. cp this file to ~/Library/LaunchAgents/com.cameronsjo.kanban-mcp.plist
-    3. launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.cameronsjo.kanban-mcp.plist
-    4. launchctl kickstart -k gui/$(id -u)/com.cameronsjo.kanban-mcp
+    1. Edit EnvironmentVariables and replace /Users/CHANGE_ME with your absolute home path.
+       launchd does not expand ~ or environment variables in the log paths.
+    2. mkdir -p "$HOME/Library/Logs"
+    3. cp this file to ~/Library/LaunchAgents/com.cameronsjo.kanban-mcp.plist
+    4. chmod 600 ~/Library/LaunchAgents/com.cameronsjo.kanban-mcp.plist
+    5. launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.cameronsjo.kanban-mcp.plist
+    6. launchctl kickstart -k gui/$(id -u)/com.cameronsjo.kanban-mcp
 
   The server binds 127.0.0.1 only. KeepAlive restarts it on crash; RunAtLoad
   starts it at login. Logs go to ~/Library/Logs/kanban-mcp.{out,err}.log.
@@ -49,8 +52,8 @@
     <true/>
 
     <key>StandardOutPath</key>
-    <string>/tmp/kanban-mcp.out.log</string>
+    <string>/Users/CHANGE_ME/Library/Logs/kanban-mcp.out.log</string>
     <key>StandardErrorPath</key>
-    <string>/tmp/kanban-mcp.err.log</string>
+    <string>/Users/CHANGE_ME/Library/Logs/kanban-mcp.err.log</string>
 </dict>
 </plist>

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Gate release publishing on race tests, vet and pinned vulnerability scanning; use the same pinned scanner in Go CI.
+- Revalidate batch task card IDs, require remote bearer tokens of at least 32 characters, and refuse login redirects.
+- Document TLS for LAN access and use per-user launchd log paths with explicit installation instructions.
+
 - Require Go 1.26.9 or newer so builds include the patched standard library identified by the vulnerability scanner.
 
 - Add a Go MCP server with shared Streamable HTTP and a stdio option while retaining the TypeScript server.

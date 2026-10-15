@@ -28,3 +28,20 @@ func TestCardDetailsRejectsNonNumericCardID(t *testing.T) {
 		t.Fatalf("cardId path-traversal must be rejected at Layer B, got %v", err)
 	}
 }
+
+func TestTaskBatchRejectsNonNumericCardIDBeforeAnyRequest(t *testing.T) {
+	for _, id := range []string{"abc", "1/task-lists", "1/../../users", "", "١"} {
+		t.Run(id, func(t *testing.T) {
+			m := &mockPlanka{}
+			c := newToolClient(t, m)
+			tasks := []taskBatchItem{{CardID: "42", Name: "valid first task"}, {CardID: id, Name: "invalid second task"}}
+			_, err := dispatchTask(context.Background(), c, taskArgs{Action: "batch_create", Tasks: &tasks})
+			if err == nil || !strings.Contains(err.Error(), "tasks[1].cardId") {
+				t.Fatalf("batch must reject indexed invalid cardId, got %v", err)
+			}
+			if got := len(m.reqs()); got != 0 {
+				t.Fatalf("invalid batch made %d requests before rejection", got)
+			}
+		})
+	}
+}

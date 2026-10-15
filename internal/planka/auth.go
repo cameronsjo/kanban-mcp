@@ -37,7 +37,15 @@ func (c *Client) login(ctx context.Context) (string, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", c.userAgent)
 
-	resp, err := c.http.Do(req)
+	// Login must never follow a redirect: credentials are sent in the POST body,
+	// and redirect targets may be a different origin. Clone the configured client
+	// so its transport, timeout, and cookie jar remain in effect without mutating
+	// shared client state or changing redirect behavior for normal API requests.
+	loginHTTP := *c.http
+	loginHTTP.CheckRedirect = func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	resp, err := loginHTTP.Do(req)
 	if err != nil {
 		logger.Error("Failed to authenticate agent with Planka", "email", c.email, "error", redactErrorForLogging(err))
 		return "", wrapRedactedURLError("authenticate agent with Planka", url, err)

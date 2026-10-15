@@ -33,7 +33,9 @@ kanban-mcp --transport http --addr 127.0.0.1:8900
 Run it under launchd (macOS) for crash-restart + login-start — see
 `deploy/launchd/com.cameronsjo.kanban-mcp.plist` — or as the profile-gated
 `kanban-mcp` service in `docker-compose.yml` (`docker compose --profile mcp up -d`). The container explicitly opts into
-remote binding and refuses startup unless `PLANKA_MCP_AUTH_TOKEN` is nonblank.
+remote binding and refuses startup unless `PLANKA_MCP_AUTH_TOKEN` has at least
+32 characters after trimming surrounding whitespace. Use a cryptographically
+random token rather than a memorable password.
 
 For an intentional LAN bind, set the token and pass `--allow-remote`:
 
@@ -42,11 +44,22 @@ kanban-mcp --transport http --addr 0.0.0.0:8900 --allow-remote
 ```
 
 Without that flag, only literal loopback IPs (`127.0.0.1`, `[::1]`) are accepted.
-The explicit mode requires a token even when its address is loopback. Both
-`/mcp` and `/healthz` require the bearer header when a token is configured;
-TLS and network access restrictions remain the operator’s responsibility.
+The explicit mode requires a token of at least 32 characters even when its address
+is loopback. Both
+`/mcp` and `/healthz` require the bearer header when a token is configured.
+A LAN bind needs a TLS-terminating reverse proxy in front: clients must use
+HTTPS so the bearer token is encrypted in transit. The daemon serves plain HTTP
+on the private backend connection; do not expose that connection directly to LAN clients.
 Compose retains optional token interpolation so its default Planka-only profile
 can be validated without MCP credentials; the MCP process enforces the requirement.
+
+For launchd, edit both log paths to your absolute home directory under
+`Library/Logs`, create that directory before loading, and keep the installed plist
+mode `600` because it contains the agent password. The template deliberately uses
+`/Users/CHANGE_ME`; launchd does not expand `~` in these paths.
+
+Login requests refuse redirects. Configure `PLANKA_BASE_URL` to the final Planka
+origin so the password is never forwarded to a redirect destination.
 
 ## 3. Switch the MCP config: N stdio entries → 1 HTTP entry
 
