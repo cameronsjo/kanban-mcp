@@ -15,3 +15,16 @@ Acceptance limits approved by Cameron: no live Planka instance is available, so 
 Validation: full Go race suite, vet/build/gofmt, four static target builds, vulnerability scan, TypeScript build/lint/61 unit tests, native Compose and GoReleaser configuration checks, SDK/CLI HTTP acceptance, and independent security/code finding closure passed. Regression mutants and exact restoration are recorded in the orchestrator report; paid/live backend acceptance remains excluded.
 
 CI follow-up: both Go jobs at e17f8d2 correctly failed vulnerability scanning under the original Go 1.26.4 pin. Raised the minimum to the patched Go 1.26.9 release. Exact `GOTOOLCHAIN=go1.26.9` full race suite, vet/build, CLI acceptance, all four cross-builds, and the unchanged vulnerability scanner passed; matching gofmt was clean. The binary metadata confirms Go 1.26.9. Scanner and workflow checks remain unchanged.
+
+## Authorized posted-review follow-up
+
+Cameron explicitly requested these six fixes after the reviews at `0d3e24c`:
+
+- [x] Gate release publication on a same-workflow read-only test job with race tests, vet, and version-pinned govulncheck.
+- [x] Pin govulncheck in ordinary Go CI to the same version.
+- [ ] Revalidate every batch task card ID before any Planka request.
+- [ ] Require remote tokens of at least 32 characters and document TLS in front of LAN binds.
+- [ ] Refuse login redirects without changing ordinary API request redirects.
+- [ ] Move launchd template log paths into the operator’s absolute Library/Logs directory.
+
+Keep PR #4 open/ready, push only the fork feature ref, and update the orchestrator report. No release/deployment is authorized.
