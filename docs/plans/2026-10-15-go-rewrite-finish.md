@@ -13,3 +13,5 @@ Codex is finishing Cameron’s approved fork-only Go rewrite for PR #4. The Type
 Acceptance limits approved by Cameron: no live Planka instance is available, so parity is verified against current fork source/contracts and mocked HTTP fixtures; no production migration or claimed measured memory savings.
 
 Validation: full Go race suite, vet/build/gofmt, four static target builds, vulnerability scan, TypeScript build/lint/61 unit tests, native Compose and GoReleaser configuration checks, SDK/CLI HTTP acceptance, and independent security/code finding closure passed. Regression mutants and exact restoration are recorded in the orchestrator report; paid/live backend acceptance remains excluded.
+
+CI follow-up: both Go jobs at e17f8d2 correctly failed vulnerability scanning under the original Go 1.26.4 pin. Raised the minimum to the patched Go 1.26.9 release. Exact `GOTOOLCHAIN=go1.26.9` full race suite, vet/build, CLI acceptance, all four cross-builds, and the unchanged vulnerability scanner passed; matching gofmt was clean. The binary metadata confirms Go 1.26.9. Scanner and workflow checks remain unchanged.

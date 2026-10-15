@@ -1,6 +1,6 @@
 module github.com/cameronsjo/kanban-mcp
 
-go 1.26.4
+go 1.26.9
 
 require (
 	github.com/google/jsonschema-go v0.4.3
