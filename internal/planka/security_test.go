@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/cameronsjo/kanban-mcp/internal/config"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
@@ -50,6 +52,35 @@ func TestRedactURLForLoggingMalformedURLStillRemovesUserinfo(t *testing.T) {
 	got := RedactURLForLogging("http://agent:secret@%zz/path")
 	if strings.Contains(got, "secret") || strings.Contains(got, "agent:") {
 		t.Fatalf("malformed URL retained userinfo: %q", got)
+	}
+}
+
+func TestRedactURLForLoggingOpaqueURLUsesPlaceholder(t *testing.T) {
+	got := RedactURLForLogging("agent:secret@example.com")
+	if got != invalidURLPlaceholder {
+		t.Fatalf("RedactURLForLogging() = %q, want %q", got, invalidURLPlaceholder)
+	}
+	if strings.Contains(got, "secret") {
+		t.Fatalf("opaque URL leaked credential: %q", got)
+	}
+}
+
+func TestNewClientLoginOpaqueBaseURLErrorUsesPlaceholder(t *testing.T) {
+	c := NewClient(config.Config{
+		BaseURL:       "agent:secret@example.com",
+		AgentEmail:    "agent@example.com",
+		AgentPassword: "password",
+	}, "test")
+
+	_, err := c.login(context.Background())
+	if err == nil {
+		t.Fatal("login returned nil, want malformed-base-URL error")
+	}
+	if strings.Contains(err.Error(), "secret") || strings.Contains(err.Error(), "agent:") {
+		t.Fatalf("login error leaked opaque URL credentials: %q", err)
+	}
+	if !strings.Contains(err.Error(), invalidURLPlaceholder) {
+		t.Fatalf("login error = %q, want %q placeholder", err, invalidURLPlaceholder)
 	}
 }
 

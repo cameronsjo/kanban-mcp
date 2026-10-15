@@ -30,14 +30,22 @@ import (
 
 var logger = slog.Default()
 
+const invalidURLPlaceholder = "<invalid-url>"
+
 // RedactURLForLogging removes URL userinfo before an operator-configured URL
 // reaches an error or log line. A malformed URL is handled conservatively by
 // removing the userinfo segment when it can still be identified.
 func RedactURLForLogging(raw string) string {
 	parsed, err := url.Parse(raw)
 	if err == nil {
+		if parsed.Scheme == "" || parsed.Host == "" {
+			return invalidURLPlaceholder
+		}
 		parsed.User = nil
 		return parsed.String()
+	}
+	if !strings.Contains(raw, "://") {
+		return invalidURLPlaceholder
 	}
 	return redactRawURLUserinfo(raw)
 }
