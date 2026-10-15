@@ -1,0 +1,48 @@
+name: Go CI
+
+# Fast checks for the Go server. Path-filtered so it stays independent of the
+# Node CI (ci.yml) — neither runs on the other's changes.
+on:
+  push:
+    branches: [main, go-rewrite]
+    paths: ["**.go", "go.mod", "go.sum", ".github/workflows/go-ci.yml", ".github/workflows/release.yml", "scripts/check-release-policy.py"]
+  pull_request:
+    paths: ["**.go", "go.mod", "go.sum", ".github/workflows/go-ci.yml", ".github/workflows/release.yml", "scripts/check-release-policy.py"]
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: release policy
+        run: python3 scripts/check-release-policy.py
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l internal cmd)"
+          if [ -n "$unformatted" ]; then
+            echo "gofmt needed on:"; echo "$unformatted"; exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: build
+        run: go build ./...
+
+      - name: test (race)
+        run: go test ./... -race -count=1
+
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...

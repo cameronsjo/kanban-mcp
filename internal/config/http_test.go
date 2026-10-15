@@ -1,0 +1,44 @@
+package config
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestHTTPExposurePolicy(t *testing.T) {
+	for _, tc := range []struct {
+		name, addr, token string
+		remote, ok        bool
+	}{
+		{"default IPv4", DefaultAddr, "", false, true},
+		{"IPv6 loopback", "[::1]:8900", "", false, true},
+		{"other loopback", "127.0.0.2:0", "", false, true},
+		{"wildcard", "0.0.0.0:8900", "token", false, false},
+		{"empty host", ":8900", "token", false, false},
+		{"IPv6 wildcard", "[::]:8900", "token", false, false},
+		{"LAN", "192.0.2.1:8900", "token", false, false},
+		{"DNS loopback", "localhost:8900", "token", false, false},
+		{"remote no token", "0.0.0.0:8900", "", true, false},
+		{"remote blank token", "0.0.0.0:8900", " \t\n", true, false},
+		{"explicit local no token", DefaultAddr, "", true, false},
+		{"remote one character", "0.0.0.0:8900", "x", true, false},
+		{"remote 31 characters", "0.0.0.0:8900", strings.Repeat("a", 31), true, false},
+		{"remote padded short token", "0.0.0.0:8900", " " + strings.Repeat("a", 31) + " ", true, false},
+		{"remote 31 Unicode characters", "0.0.0.0:8900", strings.Repeat("é", 31), true, false},
+		{"explicit local short token", DefaultAddr, "short", true, false},
+		{"remote authenticated", "0.0.0.0:8900", strings.Repeat("a", 32), true, true},
+		{"remote IPv6 authenticated", "[::]:8900", strings.Repeat("a", 32), true, true},
+		{"bad address", "127.0.0.1", strings.Repeat("a", 32), true, false},
+		{"bad port", "127.0.0.1:http", strings.Repeat("a", 32), true, false},
+		{"negative port", "127.0.0.1:-1", strings.Repeat("a", 32), true, false},
+		{"oversized port", "127.0.0.1:65536", strings.Repeat("a", 32), true, false},
+		{"host whitespace", " 127.0.0.1:8900", strings.Repeat("a", 32), true, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := (Config{Addr: tc.addr, AuthToken: tc.token, AllowRemote: tc.remote}).ValidateHTTP()
+			if (err == nil) != tc.ok {
+				t.Fatalf("accepted=%v want=%v, err=%v", err == nil, tc.ok, err)
+			}
+		})
+	}
+}

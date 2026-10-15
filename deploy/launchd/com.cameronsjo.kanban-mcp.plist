@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd user agent for the kanban-mcp Streamable-HTTP daemon.
+
+  Install:
+    1. Edit EnvironmentVariables and replace /Users/CHANGE_ME with your absolute home path.
+       launchd does not expand ~ or environment variables in the log paths.
+    2. mkdir -p "$HOME/Library/Logs"
+    3. cp this file to ~/Library/LaunchAgents/com.cameronsjo.kanban-mcp.plist
+    4. chmod 600 ~/Library/LaunchAgents/com.cameronsjo.kanban-mcp.plist
+    5. launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.cameronsjo.kanban-mcp.plist
+    6. launchctl kickstart -k gui/$(id -u)/com.cameronsjo.kanban-mcp
+
+  The server binds 127.0.0.1 only. KeepAlive restarts it on crash; RunAtLoad
+  starts it at login. Logs go to ~/Library/Logs/kanban-mcp.{out,err}.log.
+
+  Adjust the ProgramArguments path to wherever the binary lives
+  (e.g. /opt/homebrew/bin/kanban-mcp after `brew install cameronsjo/tap/kanban-mcp`).
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.cameronsjo.kanban-mcp</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/kanban-mcp</string>
+        <string>--transport</string>
+        <string>http</string>
+        <string>--addr</string>
+        <string>127.0.0.1:8900</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PLANKA_BASE_URL</key>
+        <string>http://localhost:3000</string>
+        <key>PLANKA_AGENT_EMAIL</key>
+        <string>CHANGE_ME</string>
+        <key>PLANKA_AGENT_PASSWORD</key>
+        <string>CHANGE_ME</string>
+        <key>PLANKA_ADMIN_ID</key>
+        <string>CHANGE_ME</string>
+        <!-- Optional: gate the HTTP transport behind a bearer token. -->
+        <key>PLANKA_MCP_AUTH_TOKEN</key>
+        <string></string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/CHANGE_ME/Library/Logs/kanban-mcp.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/CHANGE_ME/Library/Logs/kanban-mcp.err.log</string>
+</dict>
+</plist>

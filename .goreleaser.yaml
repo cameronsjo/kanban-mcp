@@ -1,0 +1,85 @@
+# goreleaser config for the Go kanban-mcp server.
+# Build: a single static binary (CGO disabled) for darwin+linux on amd64/arm64,
+# shipped as archives + checksums, a Homebrew cask in cameronsjo/homebrew-tap,
+# and a distroless container image to GHCR.
+#
+# Releasing requires user action: a pushed tag, the GitHub-App cross-repo auth
+# for the tap (see the releasing-to-homebrew-tap skill), and GHCR login. Until
+# then `goreleaser build --snapshot --clean` exercises the build locally.
+version: 2
+
+project_name: kanban-mcp
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: kanban-mcp
+    main: ./cmd/kanban-mcp
+    binary: kanban-mcp
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: default
+    formats:
+      - tar.gz
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+homebrew_casks:
+  - name: kanban-mcp
+    repository:
+      owner: cameronsjo
+      name: homebrew-tap
+    homepage: https://github.com/cameronsjo/kanban-mcp
+    description: MCP server for Planka kanban boards (Go, shared Streamable-HTTP daemon)
+    # The binary is unsigned; clear the quarantine attribute so first launch
+    # does not trip Gatekeeper.
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/kanban-mcp"]
+          end
+
+dockers:
+  - image_templates:
+      - "ghcr.io/cameronsjo/kanban-mcp:{{ .Version }}"
+      - "ghcr.io/cameronsjo/kanban-mcp:latest"
+    dockerfile: Dockerfile.goreleaser
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.source=https://github.com/cameronsjo/kanban-mcp"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+
+release:
+  github:
+    owner: cameronsjo
+    name: kanban-mcp
