@@ -51,7 +51,11 @@ def require(condition: bool, message: str) -> None:
 
 
 def run_values(text: str) -> list[str]:
-    """Return commands from actual, uncommented `run:` entries."""
+    """Return values from actual, uncommented single-line `run:` entries.
+
+    Block scalars are intentionally excluded from required policy commands so
+    a gate cannot hide failure handling inside a shell script.
+    """
     lines = text.splitlines()
     values: list[str] = []
     index = 0
@@ -65,7 +69,6 @@ def run_values(text: str) -> list[str]:
             index += 1
             continue
         value = match.group("value")
-        values.append(value)
         if value in {"|", ">", "|-", ">-", "|+", ">+"}:
             base_indent = len(match.group("indent"))
             index += 1
@@ -73,10 +76,9 @@ def run_values(text: str) -> list[str]:
                 nested = lines[index]
                 if nested.strip() and len(nested) - len(nested.lstrip()) <= base_indent:
                     break
-                if not nested.lstrip().startswith("#"):
-                    values.append(nested.strip())
                 index += 1
             continue
+        values.append(value)
         index += 1
     return values
 
@@ -95,6 +97,14 @@ def check(release_path: Path, ci_path: Path) -> None:
     quality = jobs["quality"]
     publish = jobs["publish"]
     require(
+        re.search(r"^defaults:", release, re.MULTILINE) is None,
+        "release workflow must retain default shell semantics",
+    )
+    require(
+        re.search(r"^\s*(?:defaults|shell):", quality, re.MULTILINE) is None,
+        "quality job must retain default shell semantics",
+    )
+    require(
         re.search(r"^    needs:\s*(?:quality|\[quality\])\s*$", publish, re.MULTILINE)
         is not None,
         "publish job must need quality",
@@ -102,6 +112,10 @@ def check(release_path: Path, ci_path: Path) -> None:
     require(
         re.search(r"^\s*if:\s*", publish, re.MULTILINE) is None,
         "publish job must use default success semantics",
+    )
+    require(
+        re.search(r"^\s*if:\s*", quality, re.MULTILINE) is None,
+        "quality job must not override success semantics",
     )
     require(
         re.search(r"^\s*continue-on-error:\s*", quality, re.MULTILINE) is None,

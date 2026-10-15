@@ -28,3 +28,5 @@ Cameron explicitly requested these six fixes after the reviews at `0d3e24c`:
 - [ ] Move launchd template log paths into the operator’s absolute Library/Logs directory.
 
 Keep PR #4 open/ready, push only the fork feature ref, and update the orchestrator report. No release/deployment is authorized.
+
+Release-policy review: the committed regression guard accepts only the explicit single-line required commands and default shell/success semantics; deliberate dependency, scanner, skip, suppression, script-block and shell-override mutants fail. Native actionlint and independent security closure passed. This structural guard is not a general YAML security parser.
