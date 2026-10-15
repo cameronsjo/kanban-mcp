@@ -81,8 +81,7 @@ func (c *Client) AddLabelToCard(ctx context.Context, cardID, labelID string) (ma
 	body := map[string]any{
 		"labelId": labelID,
 	}
-	var env itemEnvelope[CardLabel]
-	if err := c.Post(ctx, "/api/cards/"+cardID+"/card-labels", body, &env); err != nil {
+	if err := c.Post(ctx, "/api/cards/"+cardID+"/card-labels", body, nil); err != nil {
 		return nil, err
 	}
 	return map[string]bool{"success": true}, nil

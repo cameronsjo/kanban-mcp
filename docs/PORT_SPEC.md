@@ -301,7 +301,7 @@ Layer-A IDs: `applyIDPattern("id", "cardId")`. No value enums.
 - `func (c *Client) CreateComment(ctx, cardID, text string) (*Comment, error)` —
   POST `/api/cards/{cardId}/comments` body `{text}`; PROPAGATE; item.
 - `func (c *Client) GetComments(ctx, cardID string) ([]Comment, error)` — GET
-  `/api/cards/{cardId}/comments`; decode `listEnvelope[Comment]`; return items;
+  `/api/cards/{cardId}/comments`; accept an items envelope or a bare comment array, normalizing missing/null items to `[]`;
   PROPAGATE request errors (no try/catch around the request).
 - `func (c *Client) GetComment(ctx, id string) (*Comment, error)` — board-walk
   (Planka has no GET-by-id): GET `/api/projects`; if no `included.Boards` → error

@@ -44,12 +44,11 @@ type Board struct {
 }
 
 // List ports PlankaListSchema. Planka 2.1.1 auto-creates system lists with a
-// null name; a JSON null decodes to "" here, which simply fails name matching
-// (the intended behavior) rather than erroring.
+// null name; preserve that distinction for callers and output serialization.
 type List struct {
 	ID        string  `json:"id"`
 	BoardID   string  `json:"boardId"`
-	Name      string  `json:"name"`
+	Name      *string `json:"name"`
 	Position  float64 `json:"position"`
 	Type      string  `json:"type,omitempty"`
 	CreatedAt string  `json:"createdAt"`

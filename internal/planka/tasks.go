@@ -7,9 +7,9 @@ import (
 
 // BatchTaskInput is one item in a BatchCreateTasks call.
 type BatchTaskInput struct {
-	CardID   string
-	Name     string
-	Position *float64
+	CardID   string   `json:"cardId"`
+	Name     string   `json:"name"`
+	Position *float64 `json:"position"`
 }
 
 // BatchTaskResult is the per-item shape inside BatchResult.Results.
@@ -150,7 +150,11 @@ func (c *Client) BatchCreateTasks(ctx context.Context, items []BatchTaskInput) (
 
 	for i, item := range items {
 		pos := float64(65535 * (i + 1))
-		if item.Position != nil && *item.Position != 0 {
+		if item.Position == nil || *item.Position == 0 {
+			// TypeScript fills the default into the task object before invoking
+			// createTask, so failures must retain that resolved position too.
+			item.Position = &pos
+		} else {
 			pos = *item.Position
 		}
 		task, err := c.CreateTask(ctx, item.CardID, item.Name, pos)

@@ -110,3 +110,31 @@ func TestBoardSummaryAssemblesStats(t *testing.T) {
 		}
 	}
 }
+
+func TestBoardSummaryPreservesNullSystemListName(t *testing.T) {
+	m := &mockPlanka{respond: func(r capturedRequest) (int, string) {
+		switch {
+		case r.Method == "GET" && r.Path == "/api/boards/7":
+			return 200, `{"item":{"id":"7","name":"B"},"included":{"lists":[{"id":"SYS","boardId":"7","name":null,"position":1}],"labels":[]}}`
+		case r.Method == "GET" && r.Path == "/api/projects":
+			return 200, `{"items":[],"included":{}}`
+		}
+		return 404, `{"message":"unexpected ` + r.Method + " " + r.Path + `"}`
+	}}
+	c := newToolClient(t, m)
+
+	result, err := boardSummary(context.Background(), c, "7", false, false)
+	if err != nil {
+		t.Fatalf("boardSummary: %v", err)
+	}
+	wire, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+	if !strings.Contains(string(wire), `"name":null`) {
+		t.Fatalf("summary = %s, want system list name:null", wire)
+	}
+	if !strings.Contains(string(wire), `"backlogCount":0`) {
+		t.Fatalf("summary = %s, want no backlog match", wire)
+	}
+}

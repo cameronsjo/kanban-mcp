@@ -101,6 +101,7 @@ func (c *Client) GetCardStopwatch(ctx context.Context, id string) (any, error) {
 		"current":          current,
 		"formattedTotal":   formatDuration(sw.Total),
 		"formattedCurrent": formatDuration(current),
+		"startedAt":        nil,
 	}
 	if sw.StartedAt != nil {
 		result["startedAt"] = *sw.StartedAt

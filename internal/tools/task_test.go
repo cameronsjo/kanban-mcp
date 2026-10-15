@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -226,6 +227,65 @@ func TestTaskBatchCreateHappyPath(t *testing.T) {
 	}
 	if len(br.Failures) != 0 {
 		t.Errorf("got %d failures, want 0", len(br.Failures))
+	}
+}
+
+func TestTaskBatchCreateFailureUsesResolvedPositionAndJSONShape(t *testing.T) {
+	m := &mockPlanka{respond: func(r capturedRequest) (int, string) {
+		if r.Method == "GET" && strings.HasPrefix(r.Path, "/api/cards/") {
+			return 200, cardWithTaskListJSON("7")
+		}
+		if r.Method == "POST" && r.Path == "/api/task-lists/7/tasks" {
+			return 500, `{"message":"task create failed"}`
+		}
+		return 404, `{"message":"unexpected"}`
+	}}
+	c := newToolClient(t, m)
+	items := []taskBatchItem{
+		{CardID: "42", Name: "Task A"},
+		{CardID: "42", Name: "Task B", Position: fp(0)},
+	}
+
+	result, err := dispatchTask(context.Background(), c, taskArgs{
+		Action: "batch_create", Tasks: &items,
+	})
+	if err != nil {
+		t.Fatalf("batch_create: %v", err)
+	}
+	wire, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+	var decoded struct {
+		Failures []struct {
+			Task map[string]json.RawMessage `json:"task"`
+		} `json:"failures"`
+	}
+	if err := json.Unmarshal(wire, &decoded); err != nil {
+		t.Fatalf("json.Unmarshal result %q: %v", wire, err)
+	}
+	if len(decoded.Failures) != 2 {
+		t.Fatalf("failures = %d, want 2; result=%s", len(decoded.Failures), wire)
+	}
+	for i, wantPosition := range []float64{65535, 131070} {
+		task := decoded.Failures[i].Task
+		for _, key := range []string{"cardId", "name", "position"} {
+			if _, ok := task[key]; !ok {
+				t.Errorf("failure[%d] task missing %q: %s", i, key, wire)
+			}
+		}
+		for _, key := range []string{"CardID", "Name", "Position"} {
+			if _, ok := task[key]; ok {
+				t.Errorf("failure[%d] task has Go key %q: %s", i, key, wire)
+			}
+		}
+		var position float64
+		if err := json.Unmarshal(task["position"], &position); err != nil {
+			t.Fatalf("failure[%d] position: %v", i, err)
+		}
+		if position != wantPosition {
+			t.Errorf("failure[%d] position = %v, want %v", i, position, wantPosition)
+		}
 	}
 }
 

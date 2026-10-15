@@ -1,7 +1,9 @@
 package planka
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 )
 
@@ -22,9 +24,25 @@ func (c *Client) CreateComment(ctx context.Context, cardID, text string) (*Comme
 // Mirrors getComments in comments.ts — PROPAGATE request errors (no try/catch
 // around the request itself).
 func (c *Client) GetComments(ctx context.Context, cardID string) ([]Comment, error) {
-	var env listEnvelope[Comment]
-	if err := c.Get(ctx, "/api/cards/"+cardID+"/comments", &env); err != nil {
+	var raw json.RawMessage
+	if err := c.Get(ctx, "/api/cards/"+cardID+"/comments", &raw); err != nil {
 		return nil, err
+	}
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) > 0 && trimmed[0] == '[' {
+		var comments []Comment
+		if err := json.Unmarshal(trimmed, &comments); err != nil {
+			return nil, fmt.Errorf("decode comments response: %w", err)
+		}
+		return comments, nil
+	}
+
+	var env listEnvelope[Comment]
+	if err := json.Unmarshal(trimmed, &env); err != nil {
+		return nil, fmt.Errorf("decode comments response: %w", err)
+	}
+	if env.Items == nil {
+		return []Comment{}, nil
 	}
 	return env.Items, nil
 }
@@ -47,8 +65,7 @@ func (c *Client) GetComment(ctx context.Context, id string) (*Comment, error) {
 		// GET /api/boards/{id} to enumerate cards.
 		var boardEnv itemEnvelope[Board]
 		if err := c.Get(ctx, "/api/boards/"+board.ID, &boardEnv); err != nil {
-			// Mirror TS: continue on board fetch errors (inner loop continues).
-			continue
+			return nil, err
 		}
 		if boardEnv.Included == nil || len(boardEnv.Included.Cards) == 0 {
 			continue
@@ -58,7 +75,7 @@ func (c *Client) GetComment(ctx context.Context, id string) (*Comment, error) {
 			// GET /api/cards/{cardId}/comments to search for the comment.
 			var commentsEnv listEnvelope[Comment]
 			if err := c.Get(ctx, "/api/cards/"+card.ID+"/comments", &commentsEnv); err != nil {
-				continue
+				return nil, err
 			}
 			for i := range commentsEnv.Items {
 				if commentsEnv.Items[i].ID == id {

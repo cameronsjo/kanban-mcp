@@ -156,7 +156,7 @@ func boardSummary(ctx context.Context, client *planka.Client, boardID string, in
 
 func findListByName(lists []summaryList, name string) *summaryList {
 	for i := range lists {
-		if strings.ToLower(lists[i].List.Name) == name {
+		if lists[i].List.Name != nil && strings.ToLower(*lists[i].List.Name) == name {
 			return &lists[i]
 		}
 	}
