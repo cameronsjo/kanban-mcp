@@ -10,7 +10,10 @@ package config
 
 import (
 	"errors"
+	"fmt"
+	"net"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -42,13 +45,15 @@ type Config struct {
 	// AuthToken, when set, gates the HTTP transport behind a static
 	// "Authorization: Bearer <token>" header.
 	AuthToken string
+	// AllowRemote explicitly enables non-loopback HTTP with mandatory bearer auth.
+	AllowRemote bool
 }
 
 // DefaultBaseURL matches the TypeScript server's fallback.
 const DefaultBaseURL = "http://localhost:3000"
 
 // DefaultAddr binds loopback only — the daemon holds admin creds and must never
-// listen on a routable interface.
+// listen on a routable interface without explicit authenticated opt-in.
 const DefaultAddr = "127.0.0.1:8900"
 
 // normalizeBaseURL strips a trailing "/api" so request paths can be joined
@@ -84,6 +89,33 @@ var ErrMissingCredentials = errors.New("PLANKA_AGENT_EMAIL and PLANKA_AGENT_PASS
 func (c Config) Validate() error {
 	if c.AgentEmail == "" || c.AgentPassword == "" {
 		return ErrMissingCredentials
+	}
+	return nil
+}
+
+// ValidateHTTP rejects unsafe or malformed listener configurations before binding.
+// Literal loopback addresses avoid DNS changes turning a local bind into remote exposure.
+func (c Config) ValidateHTTP() error {
+	host, port, err := net.SplitHostPort(c.Addr)
+	if err != nil {
+		return fmt.Errorf("invalid HTTP listen address: %w", err)
+	}
+	n, err := strconv.Atoi(port)
+	if err != nil || n < 0 || n > 65535 {
+		return errors.New("HTTP listen port must be a number between 0 and 65535")
+	}
+	if strings.TrimSpace(host) != host {
+		return errors.New("HTTP listen host must not contain surrounding whitespace")
+	}
+	if c.AllowRemote {
+		if strings.TrimSpace(c.AuthToken) == "" {
+			return errors.New("--allow-remote requires PLANKA_MCP_AUTH_TOKEN to be nonblank")
+		}
+	} else {
+		ip := net.ParseIP(host)
+		if ip == nil || !ip.IsLoopback() {
+			return errors.New("HTTP listen address must be a literal loopback IP; remote/container binds require --allow-remote and PLANKA_MCP_AUTH_TOKEN")
+		}
 	}
 	return nil
 }

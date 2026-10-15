@@ -61,6 +61,7 @@ services:
   # The Go MCP server. Profile-gated so the default `up` (Planka + Postgres for
   # integration tests) is unaffected; run with `docker compose --profile mcp up -d`.
   # Published to host loopback only — the process holds Planka admin creds.
+  # Image explicitly enables container binds; runtime refuses an empty bearer token.
   kanban-mcp:
     image: ghcr.io/cameronsjo/kanban-mcp:latest
     container_name: kanban-mcp

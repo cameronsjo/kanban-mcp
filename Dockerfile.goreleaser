@@ -4,8 +4,8 @@
 # Inside the container the server binds 0.0.0.0 (the container's own namespace);
 # publish it to the host loopback only — e.g. compose `127.0.0.1:8900:8900` —
 # and set PLANKA_MCP_AUTH_TOKEN for the bearer gate, since the process holds
-# Planka admin credentials.
+# Planka admin credentials. Startup refuses a missing or blank token.
 FROM gcr.io/distroless/static:nonroot
 COPY kanban-mcp /usr/bin/kanban-mcp
 EXPOSE 8900
-ENTRYPOINT ["/usr/bin/kanban-mcp", "--transport", "http", "--addr", "0.0.0.0:8900"]
+ENTRYPOINT ["/usr/bin/kanban-mcp", "--transport", "http", "--addr", "0.0.0.0:8900", "--allow-remote"]

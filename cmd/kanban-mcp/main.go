@@ -30,12 +30,19 @@ func main() {
 	logger.Debug("Preparing to start kanban-mcp", "version", version)
 
 	transport := flag.String("transport", "stdio", "transport: stdio|http")
-	addr := flag.String("addr", config.DefaultAddr, "http listen address (http transport); MUST be loopback")
+	addr := flag.String("addr", config.DefaultAddr, "http listen address; loopback unless --allow-remote is set")
+	allowRemote := flag.Bool("allow-remote", false, "allow remote/container HTTP binds; requires PLANKA_MCP_AUTH_TOKEN")
 	flag.Parse()
 
 	cfg := config.FromEnv()
 	cfg.Transport = *transport
 	cfg.Addr = *addr
+	cfg.AllowRemote = *allowRemote
+	if cfg.Transport == config.TransportHTTP {
+		if err := cfg.ValidateHTTP(); err != nil {
+			log.Fatalf("kanban-mcp: %v", err)
+		}
+	}
 
 	logger.Debug("Configuration loaded", "transport", cfg.Transport, "addr", cfg.Addr)
 
@@ -50,7 +57,7 @@ func main() {
 	// One shared Planka client, reused across every request and session, so the
 	// token cache (mutex + singleflight) persists process-wide.
 	client := planka.NewClient(cfg, version)
-	logger.Debug("Planka client initialized", "baseURL", cfg.BaseURL)
+	logger.Debug("Planka client initialized", "baseURL", planka.RedactURLForLogging(cfg.BaseURL))
 
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "planka-mcp-server",
@@ -73,7 +80,7 @@ func main() {
 		logger.Debug("Starting HTTP transport", "addr", cfg.Addr)
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
-		if err := serve.HTTP(ctx, cfg.Addr, cfg.AuthToken, server); err != nil {
+		if err := serve.HTTP(ctx, cfg.Addr, cfg.AuthToken, cfg.AllowRemote, server); err != nil {
 			logger.Error("HTTP transport error", "error", err.Error())
 			log.Fatalf("kanban-mcp: %v", err)
 		}

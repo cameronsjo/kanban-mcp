@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/cameronsjo/kanban-mcp/internal/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -40,31 +41,31 @@ func BearerGate(token string, next http.Handler) http.Handler {
 }
 
 // Handler builds the HTTP mux: the shared MCP server at /mcp (optionally behind
-// the bearer gate) and an open /healthz. getServer returns the same server for
-// every session — that is what makes the token cache shared.
+// the bearer gate) and /healthz, both authenticated when a token is set. The
+// callback returns the same server for every session, sharing the token cache.
 func Handler(server *mcp.Server, authToken string) http.Handler {
 	streamable := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
 		return server
 	}, nil)
 
-	var mcpHandler http.Handler = streamable
-	if authToken != "" {
-		mcpHandler = BearerGate(authToken, mcpHandler)
-	}
-
 	mux := http.NewServeMux()
-	mux.Handle(MCPPath, mcpHandler)
+	mux.Handle(MCPPath, streamable)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = io.WriteString(w, "ok")
 	})
+	if authToken != "" {
+		return BearerGate(authToken, mux)
+	}
 	return mux
 }
 
 // HTTP serves the MCP server over Streamable HTTP on addr until ctx is canceled,
-// then shuts down gracefully. addr MUST be a loopback address — the process
-// holds Planka admin credentials and must never listen on a routable interface.
-func HTTP(ctx context.Context, addr, authToken string, server *mcp.Server) error {
+// then shuts down gracefully. Remote binds require explicit opt-in and auth.
+func HTTP(ctx context.Context, addr, authToken string, allowRemote bool, server *mcp.Server) error {
+	if err := (config.Config{Addr: addr, AuthToken: authToken, AllowRemote: allowRemote}).ValidateHTTP(); err != nil {
+		return err
+	}
 	logger.Debug("Preparing to bind HTTP server", "addr", addr, "hasBearerToken", authToken != "")
 
 	srv := &http.Server{

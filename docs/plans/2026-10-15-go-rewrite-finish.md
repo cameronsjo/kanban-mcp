@@ -3,7 +3,7 @@
 Codex is finishing Cameron’s approved fork-only Go rewrite for PR #4. The TypeScript implementation stays available. No release, deployment, PR merge, or live Planka acceptance is authorized.
 
 - [x] Merge `fork/planka-v2.1-compat` before implementation, preserving September security fixes.
-- [ ] Enforce loopback by default; explicit `--allow-remote` requires a nonblank bearer token before binding. Authenticate health checks when a token is configured. Align container usage and migration documentation.
+- [x] Enforce loopback by default; explicit `--allow-remote` requires a nonblank bearer token before binding. Authenticate health checks when a token is configured. Align container usage and migration documentation.
 - [ ] Port September URL redaction, operator-only terms guidance, and numeric-ID schema protections to Go; preserve conditional token invalidation and singleflight.
 - [ ] Fix reviewed response parity: empty label success, comment errors/arrays, batch failure JSON/defaults, nullable system-list names, stopped stopwatch null timestamp. Preserve the documented composite 404-as-empty exception.
 - [ ] Pin new workflow actions and scope token permissions without relaxing checks or publishing anything.

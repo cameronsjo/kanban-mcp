@@ -16,7 +16,7 @@ go build -o ./bin/kanban-mcp ./cmd/kanban-mcp
 brew install cameronsjo/tap/kanban-mcp
 ```
 
-## 2. Run the daemon (one process, loopback only)
+## 2. Run the daemon (one process, loopback by default)
 
 The env contract is unchanged from the TS server.
 
@@ -33,7 +33,21 @@ kanban-mcp --transport http --addr 127.0.0.1:8900
 
 Run it under launchd (macOS) for crash-restart + login-start — see
 `deploy/launchd/com.cameronsjo.kanban-mcp.plist` — or as the profile-gated
-`kanban-mcp` service in `docker-compose.yml` (`docker compose --profile mcp up -d`).
+`kanban-mcp` service in `docker-compose.yml` (`docker compose --profile mcp up -d`). The container explicitly opts into
+remote binding and refuses startup unless `PLANKA_MCP_AUTH_TOKEN` is nonblank.
+
+For an intentional LAN bind, set the token and pass `--allow-remote`:
+
+```bash
+kanban-mcp --transport http --addr 0.0.0.0:8900 --allow-remote
+```
+
+Without that flag, only literal loopback IPs (`127.0.0.1`, `[::1]`) are accepted.
+The explicit mode requires a token even when its address is loopback. Both
+`/mcp` and `/healthz` require the bearer header when a token is configured;
+TLS and network access restrictions remain the operator’s responsibility.
+Compose retains optional token interpolation so its default Planka-only profile
+can be validated without MCP credentials; the MCP process enforces the requirement.
 
 ## 3. Switch the MCP config: N stdio entries → 1 HTTP entry
 
@@ -67,7 +81,7 @@ npx -y @modelcontextprotocol/inspector
 # connect to http://127.0.0.1:8900/mcp
 ```
 
-Memory proof — the whole point. With several Claude sessions open against the Go
+Memory acceptance (not measured by this change): With several Claude sessions open against the Go
 server, confirm exactly one process and flat RSS:
 
 ```bash
@@ -77,3 +91,12 @@ ps -o rss= -p "$(pgrep -f kanban-mcp | head -1)"   # KB; stays ~12–20 MB flat
 
 Compare against the TS baseline: summed RSS of the per-session `node` processes
 (`pgrep -fl 'dist/index.js' | wc -l` × ~50 MB).
+
+
+## Acceptance limits
+
+The TypeScript server remains available during migration. Local automated tests
+use mocked Planka HTTP responses and exercise the real MCP HTTP transport; a live
+Planka parity run and production migration have not been performed. The composite
+board-summary path intentionally treats a comments endpoint 404 as no comments,
+while other backend failures propagate. No release or deployment is part of this PR.

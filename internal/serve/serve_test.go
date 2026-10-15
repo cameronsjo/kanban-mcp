@@ -1,6 +1,7 @@
 package serve
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -41,13 +42,37 @@ func TestBearerGateRejectsMissingOrWrongToken(t *testing.T) {
 	}
 }
 
-func TestHandlerHealthzIsOpen(t *testing.T) {
-	// /healthz must not be behind the bearer gate.
-	h := Handler(nil, "s3cret")
-	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
-	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK || rec.Body.String() != "ok" {
-		t.Fatalf("healthz = %d %q, want 200 ok", rec.Code, rec.Body.String())
+func TestHandlerAuthenticationIncludesHealthz(t *testing.T) {
+	for _, tc := range []struct {
+		token, header string
+		want          int
+	}{
+		{"", "", http.StatusOK}, {"s3cret", "", http.StatusUnauthorized},
+		{"s3cret", "Bearer wrong", http.StatusUnauthorized}, {"s3cret", "Bearer s3cret", http.StatusOK},
+	} {
+		h := Handler(nil, tc.token)
+		req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+		req.Header.Set("Authorization", tc.header)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != tc.want {
+			t.Fatalf("healthz=%d want=%d", rec.Code, tc.want)
+		}
+	}
+}
+
+func TestHTTPRejectsUnsafeConfigurationBeforeBinding(t *testing.T) {
+	for _, tc := range []struct {
+		addr, token string
+		remote      bool
+	}{
+		{"0.0.0.0:0", "", false}, {"0.0.0.0:0", "", true},
+		{"127.0.0.1:0", " ", true}, {"localhost:0", "token", false},
+	} {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		if err := HTTP(ctx, tc.addr, tc.token, tc.remote, nil); err == nil {
+			t.Fatalf("unsafe listener accepted: %s remote=%v", tc.addr, tc.remote)
+		}
 	}
 }

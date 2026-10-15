@@ -53,17 +53,68 @@ func TestStreamableHTTPListsTools(t *testing.T) {
 	}
 }
 
-func TestHealthzOverHTTP(t *testing.T) {
+func TestAuthenticatedHealthzOverHTTP(t *testing.T) {
 	ts := httptest.NewServer(serve.Handler(newRegisteredServer(t), "s3cret"))
 	defer ts.Close()
-
-	resp, err := ts.Client().Get(ts.URL + "/healthz")
-	if err != nil {
-		t.Fatalf("GET /healthz: %v", err)
+	for _, header := range []string{"", "Bearer wrong", "Bearer s3cret"} {
+		req, _ := http.NewRequest(http.MethodGet, ts.URL+"/healthz", nil)
+		req.Header.Set("Authorization", header)
+		resp, err := ts.Client().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := http.StatusUnauthorized
+		if header == "Bearer s3cret" {
+			want = http.StatusOK
+		}
+		if resp.StatusCode != want {
+			t.Fatalf("healthz=%d want=%d body=%q", resp.StatusCode, want, body)
+		}
 	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK || string(body) != "ok" {
-		t.Fatalf("/healthz = %d %q, want 200 ok (must be open even with a bearer token set)", resp.StatusCode, string(body))
+}
+
+type bearerTransport struct{ next http.RoundTripper }
+
+func (b bearerTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	cloned := r.Clone(r.Context())
+	cloned.Header.Set("Authorization", "Bearer s3cret")
+	return b.next.RoundTrip(cloned)
+}
+func TestAuthenticatedMCPListsTools(t *testing.T) {
+	ts := httptest.NewServer(serve.Handler(newRegisteredServer(t), "s3cret"))
+	defer ts.Close()
+	for _, header := range []string{"", "Bearer wrong"} {
+		req, _ := http.NewRequest(http.MethodPost, ts.URL+serve.MCPPath, nil)
+		req.Header.Set("Authorization", header)
+		resp, err := ts.Client().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("unauthenticated MCP status=%d", resp.StatusCode)
+		}
+	}
+	client := ts.Client()
+	client.Transport = bearerTransport{next: client.Transport}
+	mc := mcp.NewClient(&mcp.Implementation{Name: "tester", Version: "test"}, nil)
+	sess, err := mc.Connect(context.Background(), &mcp.StreamableClientTransport{
+		Endpoint: ts.URL + serve.MCPPath, HTTPClient: client, DisableStandaloneSSE: true,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sess.Close()
+	res, err := sess.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Tools) != 8 {
+		t.Fatalf("listed %d tools, want8", len(res.Tools))
 	}
 }
